@@ -1,0 +1,96 @@
+# M3: compile and run the CUDA C++ bandwidth probe on each MIG slice size (run BEFORE deploying NIMs in M4).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bw-probe-large
+  namespace: lfy-bench
+  labels: {app: bw-probe}
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels: {app: bw-probe}
+    spec:
+      restartPolicy: Never
+      nodeSelector: {kha.io/pool: mig}
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: kubernetes.azure.com/scalesetpriority, operator: Equal, value: spot, effect: NoSchedule}
+      containers:
+        - name: probe
+          image: ${CUDA_DEVEL_IMAGE}
+          command: ["bash", "-c"]
+          args:
+            - |
+              set -e
+              nvidia-smi -L || true
+              nvcc -O3 -std=c++17 -gencode arch=compute_${CUDA_ARCH},code=sm_${CUDA_ARCH} -o /tmp/bw /code/bandwidth_probe.cu
+              /tmp/bw 30
+          resources:
+            limits: {${MIG_LARGE}: 1}
+          volumeMounts: [{name: code, mountPath: /code}]
+      volumes: [{name: code, configMap: {name: bw-probe}}]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bw-probe-medium
+  namespace: lfy-bench
+  labels: {app: bw-probe}
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels: {app: bw-probe}
+    spec:
+      restartPolicy: Never
+      nodeSelector: {kha.io/pool: mig}
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: kubernetes.azure.com/scalesetpriority, operator: Equal, value: spot, effect: NoSchedule}
+      containers:
+        - name: probe
+          image: ${CUDA_DEVEL_IMAGE}
+          command: ["bash", "-c"]
+          args:
+            - |
+              set -e
+              nvidia-smi -L || true
+              nvcc -O3 -std=c++17 -gencode arch=compute_${CUDA_ARCH},code=sm_${CUDA_ARCH} -o /tmp/bw /code/bandwidth_probe.cu
+              /tmp/bw 30
+          resources:
+            limits: {${MIG_MEDIUM}: 1}
+          volumeMounts: [{name: code, mountPath: /code}]
+      volumes: [{name: code, configMap: {name: bw-probe}}]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bw-probe-small
+  namespace: lfy-bench
+  labels: {app: bw-probe}
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels: {app: bw-probe}
+    spec:
+      restartPolicy: Never
+      nodeSelector: {kha.io/pool: mig}
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: kubernetes.azure.com/scalesetpriority, operator: Equal, value: spot, effect: NoSchedule}
+      containers:
+        - name: probe
+          image: ${CUDA_DEVEL_IMAGE}
+          command: ["bash", "-c"]
+          args:
+            - |
+              set -e
+              nvidia-smi -L || true
+              nvcc -O3 -std=c++17 -gencode arch=compute_${CUDA_ARCH},code=sm_${CUDA_ARCH} -o /tmp/bw /code/bandwidth_probe.cu
+              /tmp/bw 30
+          resources:
+            limits: {${MIG_SMALL}: 1}
+          volumeMounts: [{name: code, mountPath: /code}]
+      volumes: [{name: code, configMap: {name: bw-probe}}]

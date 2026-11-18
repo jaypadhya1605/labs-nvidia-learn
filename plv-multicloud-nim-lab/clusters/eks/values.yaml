@@ -1,0 +1,16 @@
+# EKS (AWS, stretch) - 1x L40S 48GB (g6e.xlarge).
+cloud: eks
+llm:
+  precision: bf16                          # L40S (Ada) also supports fp8
+  profile: "vllm-bf16-tp1-pp1-feat_lora"
+  gpuResource: nvidia.com/gpu
+  cache:
+    mode: emptydir                         # EFS/FSx are the RWX options - see docs/07-csp-cheatsheet.md
+    emptyDirSizeLimit: 120Gi
+  tolerations:
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+networkPolicy:
+  enabled: false                           # the VPC CNI only enforces NetworkPolicy when its policy agent is enabled
+bench:
+  toolbox:
+    enabled: true

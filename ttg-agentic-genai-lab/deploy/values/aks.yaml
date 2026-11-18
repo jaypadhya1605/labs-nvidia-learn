@@ -1,0 +1,35 @@
+# AKS - 🔁 Lab 04's cluster (Terraform labels its GPU pool plv.io/pool=gpu): 1x A100 80GB PCIe, Spot.
+#   helm upgrade --install ttg deploy/helm/ttg -n ttg --create-namespace -f deploy/values/aks.yaml \
+#     --set image.repository=$TTG_IMAGE --set image.tag=<commit> --wait --timeout 45m
+# A100 = Ampere: no FP8 tensor cores. vLLM's online FP8 still loads here (weight-only Marlin kernels: less memory, not
+# faster math), the ModelOpt FP8 checkpoint needs Ada/Hopper/Blackwell - hence fp8Mode online below. The FP8 speed-up
+# of M5 is an H100 VM / GKE Blackwell result.
+cloud: aks
+image:
+  repository: registry.gitlab.com/your-group/ttg-agentic-genai-lab/ttg-agent
+  tag: "1.0.0"
+imagePullSecrets: [{name: gitlab-registry}]   # deploy token for the GitLab Container Registry (deploy/README.md)
+secrets:
+  mode: external                     # 🔁 Lab 04: ClusterSecretStore plv-cloud-secrets -> Azure Key Vault
+engine:
+  kind: vllm
+  variant: base
+  fp8Mode: online                    # only used with --set engine.variant=fp8 (see the A100 note above)
+  cache:
+    mode: pvc
+    storageClass: managed-csi-premium   # one engine pod: a Premium SSD (RWO) beats Azure Files for cold start
+    size: 100Gi
+    accessMode: ReadWriteOnce
+  nodeSelector:
+    plv.io/pool: gpu
+  tolerations:
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+    - {key: kubernetes.azure.com/scalesetpriority, operator: Equal, value: spot, effect: NoSchedule}
+  autoscaling:
+    enabled: false                   # M9 storm-day: true + Lab 04's prometheus-adapter rule vllm_num_requests_waiting
+agent:
+  autoscaling: {enabled: true, minReplicas: 2, maxReplicas: 10, targetCPUUtilizationPercentage: 70}
+serviceMonitor:
+  enabled: true                      # Lab 04 runs kube-prometheus-stack in namespace monitoring
+networkPolicy:
+  enabled: true                      # Azure CNI powered by Cilium enforces it (🔁 Lab 04)

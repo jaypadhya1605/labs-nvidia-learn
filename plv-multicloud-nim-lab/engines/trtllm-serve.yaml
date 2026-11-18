@@ -1,0 +1,60 @@
+# M6: the same Llama 3.1 8B served by TensorRT-LLM's own OpenAI server (trtllm-serve, PyTorch backend) - the
+# "engine underneath" comparison: NIM (vLLM profile) vs trtllm-serve on the SAME GPU with the SAME AIPerf preset.
+#   TRTLLM_MODEL=meta-llama/Llama-3.1-8B-Instruct      (BF16; gated - needs the HF token secret)
+#   TRTLLM_MODEL=nvidia/Llama-3.1-8B-Instruct-FP8      (Ada/Hopper/Blackwell)
+#   TRTLLM_MODEL=nvidia/Llama-3.1-8B-Instruct-NVFP4    (Blackwell: GKE RTX PRO 6000)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trtllm-serve
+  namespace: plv-serving
+  labels: {app: trtllm-serve}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: trtllm-serve}
+  template:
+    metadata:
+      labels: {app: trtllm-serve}
+    spec:
+      nodeSelector: {plv.io/pool: gpu}
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: kubernetes.azure.com/scalesetpriority, operator: Equal, value: spot, effect: NoSchedule}
+        - {key: cloud.google.com/gke-spot, operator: Equal, value: "true", effect: NoSchedule}
+      imagePullSecrets: [{name: ngc-secret}]
+      containers:
+        - name: trtllm
+          image: ${PIN_TRTLLM_IMAGE}:${PIN_TRTLLM_TAG}
+          command: ["bash", "-c"]
+          args:
+            - >-
+              trtllm-serve "${TRTLLM_MODEL}" --host 0.0.0.0 --port 8000 --backend pytorch
+              --max_batch_size 256 --max_num_tokens 8192 --max_seq_len 8192 --kv_cache_free_gpu_memory_fraction 0.85
+          env:
+            - name: HF_TOKEN
+              valueFrom: {secretKeyRef: {name: hf-token-secret, key: HF_TOKEN, optional: true}}
+            - {name: HF_HOME, value: /cache/hf}
+          ports: [{name: http, containerPort: 8000}]
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 120
+          resources:
+            limits: {nvidia.com/gpu: 1}
+          volumeMounts: [{name: cache, mountPath: /cache}, {name: dshm, mountPath: /dev/shm}]
+      volumes:
+        - {name: cache, emptyDir: {sizeLimit: 60Gi}}
+        - {name: dshm, emptyDir: {medium: Memory, sizeLimit: 8Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trtllm-serve
+  namespace: plv-serving
+  labels: {app: trtllm-serve}
+spec:
+  selector: {app: trtllm-serve}
+  ports: [{name: http, port: 8000, targetPort: 8000}]

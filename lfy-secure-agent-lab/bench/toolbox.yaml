@@ -1,0 +1,60 @@
+# Same AIPerf toolbox as Lab 02 (namespace lfy-bench). Results volume is RWX so red-team Jobs can share it.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bench-results
+  namespace: lfy-bench
+spec:
+  accessModes: [ReadWriteMany]
+  storageClassName: azurefile-csi
+  resources:
+    requests:
+      storage: 64Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bench-toolbox
+  namespace: lfy-bench
+  labels: {app: bench-toolbox}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: bench-toolbox}
+  template:
+    metadata:
+      labels: {app: bench-toolbox}
+    spec:
+      containers:
+        - name: toolbox
+          image: python:3.12-slim
+          command: ["bash", "-c"]
+          args:
+            - |
+              set -e
+              apt-get update -qq && apt-get install -y -qq --no-install-recommends curl jq procps >/dev/null
+              pip install --no-cache-dir -q "aiperf==${AIPERF_VERSION}" transformers requests
+              mkdir -p /results && touch /tmp/ready && echo "toolbox ready"
+              sleep infinity
+          env:
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef: {name: hf-token-secret, key: HF_TOKEN}
+            - {name: HF_HOME, value: /results/.hf}
+          readinessProbe:
+            exec:
+              command: ["test", "-f", "/tmp/ready"]
+            periodSeconds: 10
+            failureThreshold: 90
+          resources:
+            requests: {cpu: "2", memory: 4Gi}
+            limits: {cpu: "6", memory: 12Gi}
+          volumeMounts:
+            - {name: results, mountPath: /results}
+            - {name: code, mountPath: /code}
+      volumes:
+        - name: results
+          persistentVolumeClaim: {claimName: bench-results}
+        - name: code
+          configMap: {name: bench-code}

@@ -1,0 +1,70 @@
+{{- if and .Values.llm.enabled (eq .Values.llm.mode "deployment") }}
+{{- include "plover.verifyGuard" . }}
+# Plain-Kubernetes NIM for air-gapped sites (M9): no operator, model served from a pre-filled node-local cache,
+# no NGC_API_KEY in the pod (NIM air-gap rule), images from the local registry mirror.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "plover.llmName" . }}
+  labels: {{- include "plover.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.llm.replicas }}
+  strategy:
+    type: Recreate     # one GPU per node: a rolling update would leave the new pod Pending on "Insufficient nvidia.com/gpu"
+  selector:
+    matchLabels:
+      app: {{ include "plover.llmName" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "plover.llmName" . }}
+        app.kubernetes.io/name: {{ include "plover.llmName" . }}   # same selector as NIM Operator pods (bench, drills)
+        app.kubernetes.io/part-of: plover
+    spec:
+      securityContext:
+        runAsUser: {{ .Values.llm.userID }}
+        runAsGroup: {{ .Values.llm.groupID }}
+        fsGroup: {{ .Values.llm.groupID }}
+      nodeSelector: {{- toYaml .Values.llm.nodeSelector | nindent 8 }}
+      tolerations: {{- toYaml .Values.llm.tolerations | nindent 8 }}
+      containers:
+        - name: nim
+          image: {{ printf "%s:%s" .Values.llm.image.repository .Values.llm.image.tag }}
+          imagePullPolicy: {{ .Values.llm.image.pullPolicy }}
+          env: {{- include "plover.llmEnv" . | nindent 12 }}
+            - name: NIM_CACHE_PATH
+              value: /opt/nim/.cache
+          ports:
+            - {name: http, containerPort: 8000}
+          startupProbe:
+            httpGet: {path: /v1/health/ready, port: 8000}
+            periodSeconds: 10
+            failureThreshold: {{ .Values.llm.startupFailureThreshold }}
+          readinessProbe:
+            httpGet: {path: /v1/health/ready, port: 8000}
+            periodSeconds: 10
+          resources:
+            limits:
+              {{ .Values.llm.gpuResource }}: {{ .Values.llm.gpuCount }}
+          volumeMounts:
+            - {name: cache, mountPath: /opt/nim/.cache}
+            - {name: dshm, mountPath: /dev/shm}
+      volumes:
+        - name: cache
+          hostPath:
+            path: {{ .Values.llm.cache.hostPath }}
+            type: Directory
+        - name: dshm
+          emptyDir: {medium: Memory, sizeLimit: 16Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "plover.llmName" . }}
+  labels: {{- include "plover.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: {{ include "plover.llmName" . }}
+  ports:
+    - {name: api, port: 8000, targetPort: 8000}
+{{- end }}

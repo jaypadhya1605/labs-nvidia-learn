@@ -1,0 +1,36 @@
+# Template: run the agent red-team eval + garak + the latency check on the lab cluster and block the change on failure.
+# Same plumbing as Lab 02's perf-gate.yml (OIDC to Azure, kubectl into the cluster).
+name: safety-gate
+on:
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ vars.RG }}
+          cluster-name: ${{ vars.AKS_NAME }}
+      - name: Agent eval (defended + undefended)
+        run: |
+          kubectl -n lfy-bench exec deploy/bench-toolbox -- python3 /code/eval_agent.py --out /results/agent-eval-ci.json
+          kubectl -n lfy-bench cp "$(kubectl -n lfy-bench get pod -l app=bench-toolbox -o jsonpath='{.items[0].metadata.name}'):/results/agent-eval-ci.json" agent-eval-ci.json
+      - name: garak
+        run: |
+          kubectl -n lfy-bench delete job garak-redteam --ignore-not-found
+          cp env/lab.env.example env/lab.env && source env/lab.env && scripts/render.sh redteam/garak-job.yaml | kubectl apply -f -
+          kubectl -n lfy-bench wait --for=condition=complete job/garak-redteam --timeout=90m
+          POD="$(kubectl -n lfy-bench get pod -l app=bench-toolbox -o jsonpath='{.items[0].metadata.name}')"
+          kubectl -n lfy-bench cp "${POD}:/results/lfy-guarded.report.jsonl" lfy-guarded.report.jsonl
+      - name: Gate
+        run: python3 redteam/safety_gate.py --agent-eval agent-eval-ci.json --garak-guarded lfy-guarded.report.jsonl

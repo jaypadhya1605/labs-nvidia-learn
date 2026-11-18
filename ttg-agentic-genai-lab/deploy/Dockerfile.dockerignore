@@ -1,0 +1,8 @@
+# BuildKit reads <Dockerfile>.dockerignore next to the Dockerfile: keep the build context small.
+**
+!deploy/requirements-runtime.txt
+!ttg/**
+!data/policies/**
+!vlm/**
+**/__pycache__
+**/*.pyc

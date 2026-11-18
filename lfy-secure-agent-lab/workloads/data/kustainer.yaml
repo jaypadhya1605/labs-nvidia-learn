@@ -1,0 +1,60 @@
+# Azure Data Explorer emulator ("Kustainer"): real KQL, in-cluster, free for dev/test, no authentication.
+# Never expose it outside the cluster. Data lives in memory: re-run the loader after a restart (drill material).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kustainer
+  namespace: lfy-data
+  labels: {app: kustainer}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: kustainer}
+  template:
+    metadata:
+      labels: {app: kustainer}
+    spec:
+      containers:
+        - name: kusto
+          image: ${KUSTAINER_IMAGE}
+          env:
+            - {name: ACCEPT_EULA, value: "Y"}
+          ports:
+            - {name: http, containerPort: 8080}
+          readinessProbe:
+            tcpSocket: {port: 8080}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: {cpu: "1", memory: 4Gi}
+            limits: {cpu: "2", memory: 8Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kustainer
+  namespace: lfy-data
+spec:
+  selector: {app: kustainer}
+  ports:
+    - {name: http, port: 8080, targetPort: 8080}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: soc-data-loader
+  namespace: lfy-data
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: loader
+          image: python:3.12-slim
+          command: ["python3", "/code/gen_soc_data.py", "--load", "--kusto", "http://kustainer.lfy-data.svc:8080"]
+          volumeMounts:
+            - {name: code, mountPath: /code}
+      volumes:
+        - name: code
+          configMap: {name: soc-data-code}

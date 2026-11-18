@@ -1,0 +1,24 @@
+# NeMo Agent Toolkit (nvidia-nat 1.9.0) version of the same SOC agent: NAT's ReAct agent + our MCP tool server +
+# the guarded LLM. Schema moves fast - validate before running:
+#   pip install "nvidia-nat[mcp,langchain]==1.9.0"
+#   nat validate --config_file workloads/agent/nat-workflow.yml
+#   kubectl -n lfy-agent port-forward svc/soc-tools 9901:9901 & kubectl -n lfy-safety port-forward svc/guarded-gateway 8080:8080 &
+#   nat run --config_file workloads/agent/nat-workflow.yml --input "Triage alert LFY-0001 using SecurityAlert and the logs."
+function_groups:
+  soc_tools:
+    _type: mcp_client
+    server:
+      transport: streamable-http
+      url: http://localhost:9901/mcp
+llms:
+  guarded_llm:
+    _type: openai
+    base_url: http://localhost:8080/v1
+    model_name: meta/llama-3.1-8b-instruct
+    api_key: not-used
+    temperature: 0.0
+workflow:
+  _type: react_agent
+  tool_names: [soc_tools]
+  llm_name: guarded_llm
+  verbose: true

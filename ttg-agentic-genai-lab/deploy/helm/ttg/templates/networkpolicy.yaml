@@ -1,0 +1,110 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $e := .Values.engine }}
+{{- $a := .Values.agent }}
+{{- $ops := .Values.mcp.ops }}
+{{- $guest := .Values.mcp.guest }}
+# 🔁 Lab 03 "network policy is the last control": even a prompt-injected agent can only reach the engine, its two
+# MCP tool servers and DNS. Enforced by Cilium (AKS), Dataplane V2 (GKE) and kindnet + kube-network-policies (kind).
+{{- if $e.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $e.name }}-ingress
+  labels: {{- include "ttg.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {app: {{ $e.name }}}
+  policyTypes: [Ingress]          # egress stays open: the first start downloads weights from Hugging Face / NGC
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: {{ $a.name }}}
+        {{- range .Values.networkPolicy.engineClients }}
+        - podSelector:
+            matchLabels: {app: {{ . }}}
+        {{- end }}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: monitoring}
+        {{- range .Values.networkPolicy.allowNamespaces }}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: {{ . }}}
+        {{- end }}
+      ports:
+        - {port: 8000, protocol: TCP}
+---
+{{- end }}
+{{- if .Values.mcp.enabled }}
+{{- range $s := list $ops $guest }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $s.name }}
+  labels: {{- include "ttg.labels" $ | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {app: {{ $s.name }}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: {{ $a.name }}}
+      ports:
+        - {port: {{ $s.port }}, protocol: TCP}
+  {{- if and (eq $s.name $guest.name) $guest.vlm.baseUrl }}
+  egress:
+    - {}                           # M8: read_receipt calls the VLM endpoint
+  {{- else }}
+  egress: []                       # tools are deterministic and local: no egress at all
+  {{- end }}
+---
+{{- end }}
+{{- end }}
+{{- if $a.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $a.name }}
+  labels: {{- include "ttg.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {app: {{ $a.name }}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}           # callers in this namespace (helm test, load generator)
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: monitoring}
+        {{- range .Values.networkPolicy.allowNamespaces }}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: {{ . }}}
+        {{- end }}
+      ports:
+        - {port: {{ $a.port }}, protocol: TCP}
+  egress:
+    {{- if $e.enabled }}
+    - to:
+        - podSelector:
+            matchLabels: {app: {{ $e.name }}}
+      ports:
+        - {port: 8000, protocol: TCP}
+    {{- else }}
+    - ports:                        # hosted endpoint (agent.baseUrl): HTTPS only
+        - {port: 443, protocol: TCP}
+    {{- end }}
+    {{- if .Values.mcp.enabled }}
+    - to:
+        - podSelector:
+            matchLabels: {app: {{ $ops.name }}}
+      ports:
+        - {port: {{ $ops.port }}, protocol: TCP}
+    - to:
+        - podSelector:
+            matchLabels: {app: {{ $guest.name }}}
+      ports:
+        - {port: {{ $guest.port }}, protocol: TCP}
+    {{- end }}
+    - ports:                        # DNS (any resolver: kube-dns or GKE NodeLocal DNSCache)
+        - {port: 53, protocol: UDP}
+        - {port: 53, protocol: TCP}
+{{- end }}
+{{- end }}

@@ -1,0 +1,5 @@
+Plover Assist on {{ .Values.cloud }} (chart {{ .Chart.Version }})
+  LLM:  {{ .Values.llm.image.repository }}:{{ .Values.llm.image.tag }}  mode={{ .Values.llm.mode }} cache={{ .Values.llm.cache.mode }} gpu={{ .Values.llm.gpuResource }}
+  LoRA adapters: {{ len .Values.llm.lora.adapters }}   routing: stable={{ .Values.api.routing.stableModel | default "base+long-prompt" }} canary={{ .Values.api.routing.canaryModel | default "none" }} ({{ .Values.api.routing.canaryWeight }}%)
+Watch it come up:   kubectl -n {{ .Release.Namespace }} get nimcache,nimservice,pods -w
+Smoke test:         helm test {{ .Release.Name }} -n {{ .Release.Namespace }}

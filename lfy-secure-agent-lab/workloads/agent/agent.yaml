@@ -1,0 +1,136 @@
+# SOC agent API + MCP tool server. Both verify the playbook bundle (after M11) before starting.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: soc-agent
+  namespace: lfy-agent
+  labels: {app: soc-agent}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: soc-agent}
+  template:
+    metadata:
+      labels: {app: soc-agent}
+    spec:
+      initContainers:
+        - name: verify-playbooks
+          image: ${ACR_LOGIN_SERVER}/lfy/soc-agent:${APP_TAG}
+          command: ["bash", "/app/verify_bundle.sh", "/bundle", "/work/playbooks", "/sig/playbooks.sig"]
+          env:
+            - name: REQUIRE_SIGNATURE
+              valueFrom: {configMapKeyRef: {name: lfy-signing, key: require_signature, optional: true}}
+          volumeMounts:
+            - {name: bundle, mountPath: /bundle}
+            - {name: work, mountPath: /work}
+            - {name: sig, mountPath: /sig}
+            - {name: pubkey, mountPath: /keys}
+      containers:
+        - name: agent
+          image: ${ACR_LOGIN_SERVER}/lfy/soc-agent:${APP_TAG}
+          env:
+            - {name: GUARDED_URL, value: "http://guarded-gateway.lfy-safety.svc:8080/v1/chat/completions"}
+            - {name: DIRECT_URL, value: "http://triage-llm.lfy-agent.svc:8000/v1/chat/completions"}
+            - {name: KUSTO_URL, value: "http://kustainer.lfy-data.svc:8080"}
+            - {name: EMBED_URL, value: "http://agent-embed.lfy-agent.svc:8000/v1/embeddings"}
+            - {name: EMBED_MODEL, value: "${NIM_EMBED_MODEL}"}
+            - {name: LLM_MODEL, value: "${NIM_LLM_MODEL}"}
+            - {name: PLAYBOOK_DIR, value: /work/playbooks}
+            - {name: COMMUNITY_DIR, value: /community}
+          ports:
+            - {name: http, containerPort: 8080}
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8080}
+            initialDelaySeconds: 5
+          resources:
+            requests: {cpu: 500m, memory: 512Mi}
+            limits: {cpu: "2", memory: 1Gi}
+          volumeMounts:
+            - {name: work, mountPath: /work, readOnly: true}
+            - {name: community, mountPath: /community, readOnly: true}
+      volumes:
+        - {name: bundle, configMap: {name: lfy-playbooks}}
+        - {name: community, configMap: {name: lfy-playbooks-community}}
+        - {name: work, emptyDir: {}}
+        - {name: sig, configMap: {name: lfy-signatures, optional: true}}
+        - {name: pubkey, configMap: {name: lfy-signing, optional: true}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: soc-agent
+  namespace: lfy-agent
+  labels: {app: soc-agent}
+spec:
+  selector: {app: soc-agent}
+  ports:
+    - {name: http, port: 8080, targetPort: 8080}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: soc-agent
+  namespace: lfy-agent
+spec:
+  selector:
+    matchLabels: {app: soc-agent}
+  endpoints:
+    - {port: http, path: /metrics, interval: 15s}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: soc-tools
+  namespace: lfy-agent
+  labels: {app: soc-tools}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: soc-tools}
+  template:
+    metadata:
+      labels: {app: soc-tools}
+    spec:
+      initContainers:
+        - name: verify-playbooks
+          image: ${ACR_LOGIN_SERVER}/lfy/soc-agent:${APP_TAG}
+          command: ["bash", "/app/verify_bundle.sh", "/bundle", "/work/playbooks", "/sig/playbooks.sig"]
+          env:
+            - name: REQUIRE_SIGNATURE
+              valueFrom: {configMapKeyRef: {name: lfy-signing, key: require_signature, optional: true}}
+          volumeMounts:
+            - {name: bundle, mountPath: /bundle}
+            - {name: work, mountPath: /work}
+            - {name: sig, mountPath: /sig}
+            - {name: pubkey, mountPath: /keys}
+      containers:
+        - name: mcp
+          image: ${ACR_LOGIN_SERVER}/lfy/soc-agent:${APP_TAG}
+          command: ["python3", "/app/mcp_server.py"]
+          env:
+            - {name: KUSTO_URL, value: "http://kustainer.lfy-data.svc:8080"}
+            - {name: EMBED_URL, value: "http://agent-embed.lfy-agent.svc:8000/v1/embeddings"}
+            - {name: EMBED_MODEL, value: "${NIM_EMBED_MODEL}"}
+            - {name: PLAYBOOK_DIR, value: /work/playbooks}
+          ports:
+            - {name: mcp, containerPort: 9901}
+          resources:
+            requests: {cpu: 250m, memory: 256Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          volumeMounts:
+            - {name: work, mountPath: /work, readOnly: true}
+      volumes:
+        - {name: bundle, configMap: {name: lfy-playbooks}}
+        - {name: work, emptyDir: {}}
+        - {name: sig, configMap: {name: lfy-signatures, optional: true}}
+        - {name: pubkey, configMap: {name: lfy-signing, optional: true}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: soc-tools
+  namespace: lfy-agent
+spec:
+  selector: {app: soc-tools}
+  ports:
+    - {name: mcp, port: 9901, targetPort: 9901}

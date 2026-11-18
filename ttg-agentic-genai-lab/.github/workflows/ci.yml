@@ -1,0 +1,59 @@
+# GitHub mirror of .gitlab-ci.yml (the primary CI - JR2019035 names GitLab). Same gates, same scripts.
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  HELM_VERSION: v3.22.1
+  KUBECONFORM_VERSION: v0.8.0
+  RUFF_VERSION: "0.16.8"
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck && shellcheck -x $(git ls-files '*.sh')
+      - name: ruff (syntax errors + undefined names)
+        run: pipx run --spec "ruff==${RUFF_VERSION}" ruff check --select E9,F63,F7,F82 .
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - uses: azure/setup-helm@v4
+        with: {version: "${{ env.HELM_VERSION }}"}
+      - name: kubeconform
+        run: curl -sL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" | sudo tar xz -C /usr/local/bin kubeconform
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+      - run: scripts/validate-manifests.sh
+  eval-gate:
+    runs-on: ubuntu-latest
+    needs: test
+    env:
+      TTG_BASE_URL: http://localhost:8000/v1
+      TTG_MODEL: ttg-llm
+      TTG_MCP_MODE: http
+      TTG_MCP_OPS_URL: http://localhost:8101/mcp
+      TTG_MCP_GUEST_URL: http://localhost:8102/mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r requirements-dev.txt && mkdir -p results
+      - name: mock engine + MCP servers (streamable HTTP, the Kubernetes code path)
+        run: |
+          nohup uvicorn ttg.mock.fake_llm:app --host 127.0.0.1 --port 8000 > results/mock.log 2>&1 &
+          nohup python -m ttg.mcp.ops_server --transport streamable-http --port 8101 > results/mcp-ops.log 2>&1 &
+          nohup python -m ttg.mcp.guest_server --transport streamable-http --port 8102 > results/mcp-guest.log 2>&1 &
+          python scripts/wait_for.py http://localhost:8000/v1/models http://localhost:8101/mcp http://localhost:8102/mcp --timeout 90
+      - run: python -m ttg.bench.agent_bench --label ci-mock --engine mock --levels 4 --n 40
+      - run: python scripts/gate.py eval results/bench/ci-mock.json --min-success 0.95
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: eval-gate, path: results/}

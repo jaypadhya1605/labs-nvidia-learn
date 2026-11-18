@@ -1,0 +1,72 @@
+{{- if .Values.mcp.enabled }}
+{{- $root := . }}
+{{- range $role := list "ops" "guest" }}
+{{- $s := get $root.Values.mcp $role }}
+# MCP tool server "ttg-{{ $role }}": deterministic, stateless tools over streamable HTTP, bound to 0.0.0.0 in the pod.
+# FastMCP keeps DNS-rebinding protection on and, by default, only accepts localhost Host headers - the agent's
+# "Host: ttg-mcp-ops:8101" would get 421. TTG_MCP_ALLOWED_HOSTS lists the in-cluster names instead.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $s.name }}
+  labels: {{- include "ttg.labels" $root | nindent 4 }}
+spec:
+  replicas: {{ $s.replicas }}
+  selector:
+    matchLabels:
+      app: {{ $s.name }}
+  template:
+    metadata:
+      labels: {{- include "ttg.podLabels" (dict "name" $s.name "component" "mcp") | nindent 8 }}
+        ttg.io/mcp-role: {{ $role }}
+    spec:
+      {{- with $root.Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: mcp
+          image: {{ printf "%s:%s" $root.Values.image.repository $root.Values.image.tag }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          command: ["python", "-m", {{ printf "ttg.mcp.%s_server" $role | quote }}, "--transport", "streamable-http",
+                    "--host", "0.0.0.0", "--port", {{ $s.port | quote }}]
+          env:
+            - name: TTG_MCP_ALLOWED_HOSTS
+              value: {{ printf "%[1]s:*,%[1]s.%[2]s:*,%[1]s.%[2]s.svc:*,%[1]s.%[2]s.svc.cluster.local:*" $s.name $root.Release.Namespace | quote }}
+            {{- if and (eq $role "guest") $s.vlm.baseUrl }}
+            - {name: TTG_VLM_BASE_URL, value: {{ $s.vlm.baseUrl | quote }}}
+            - {name: TTG_VLM_MODEL, value: {{ $s.vlm.model | quote }}}
+            {{- with $s.vlm.apiKeySecret.name }}
+            - name: TTG_VLM_API_KEY
+              valueFrom: {secretKeyRef: {name: {{ . }}, key: {{ $s.vlm.apiKeySecret.key }}}}
+            {{- end }}
+            {{- end }}
+          ports:
+            - {name: mcp, containerPort: {{ $s.port }}}
+          readinessProbe:
+            tcpSocket: {port: mcp}          # /mcp only answers MCP JSON-RPC POSTs, so probe the socket
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: {port: mcp}
+            periodSeconds: 20
+          resources: {{- toYaml $root.Values.mcp.resources | nindent 12 }}
+          securityContext: {{- include "ttg.securityContext" $root | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $s.name }}
+  labels: {{- include "ttg.labels" $root | nindent 4 }}
+    app: {{ $s.name }}
+spec:
+  selector:
+    app: {{ $s.name }}
+  ports:
+    - {name: mcp, port: {{ $s.port }}, targetPort: mcp}
+---
+{{- end }}
+{{- end }}

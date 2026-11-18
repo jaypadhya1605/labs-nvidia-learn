@@ -1,0 +1,47 @@
+# Content safety on the 2g slice - Lab 02 prediction C again: 8B BF16 weights leave little KV room. Both env styles set (NIM 1.x reads NIM_MAX_MODEL_LEN, 2.x reads NIM_PASSTHROUGH_ARGS).
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: safety-guard
+  namespace: lfy-safety
+spec:
+  userID: 1000
+  groupID: 0
+  image:
+    repository: ${NIM_SAFETY_IMAGE}
+    tag: "${NIM_SAFETY_TAG}"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: safety-guard
+      profile: ''
+  env:
+    - name: NIM_MAX_MODEL_LEN
+      value: "${SAFETY_MAX_MODEL_LEN}"
+    - name: NIM_PASSTHROUGH_ARGS
+      value: "--max-model-len ${SAFETY_MAX_MODEL_LEN} --gpu-memory-utilization 0.95 --max-num-batched-tokens 2048 --max-num-seqs 16"
+  replicas: 1
+  resources:
+    limits:
+      ${MIG_MEDIUM}: 1
+  nodeSelector:
+    kha.io/pool: mig
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+  metrics:
+    enabled: true
+    serviceMonitor:
+      interval: 15s

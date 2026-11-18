@@ -1,0 +1,23 @@
+# kind (laptop): the WHOLE chart on CPU - the mock engine stands in for the GPU so you can rehearse M9 for $0.
+#   docker build -f deploy/Dockerfile -t ttg-agent:dev .
+#   . env/pins.env && kind create cluster --name ttg --image "$PIN_KIND_NODE_IMAGE"   # kind >= $PIN_KIND
+#   kind load docker-image ttg-agent:dev --name ttg
+#   helm upgrade --install ttg deploy/helm/ttg -n ttg --create-namespace -f deploy/values/kind.yaml --wait
+cloud: kind
+image:
+  repository: ttg-agent
+  tag: dev
+  pullPolicy: IfNotPresent           # `kind load` put it on the node; nothing is pulled
+secrets:
+  mode: none                         # the mock needs no Hugging Face or NGC key
+engine:
+  kind: mock
+  variant: base
+  mock:
+    faults: ""                       # try "invalid_json_once" and watch the agent's retry counter (M13 drill)
+agent:
+  replicas: 1
+  autoscaling:
+    enabled: false                   # kind has no metrics-server by default
+networkPolicy:
+  enabled: true                      # kind's default CNI (kindnet + kube-network-policies) enforces it: the drill works here

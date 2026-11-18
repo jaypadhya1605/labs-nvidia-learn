@@ -1,0 +1,55 @@
+# M10-B: identical workers, but the frontend routes by KV-cache overlap (workers publish KV events over ZMQ).
+apiVersion: nvidia.com/v1beta1
+kind: DynamoGraphDeployment
+metadata:
+  name: qwen3-agg-kv
+  namespace: kha-dynamo
+spec:
+  components:
+    - name: Frontend
+      type: frontend
+      replicas: 1
+      podTemplate:
+        spec:
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:${DYNAMO_VERSION}
+              env:
+                - {name: DYN_ROUTER_MODE, value: kv}
+    - name: VllmWorker
+      type: worker
+      replicas: 2
+      sharedMemorySize: 8Gi
+      podTemplate:
+        spec:
+          nodeSelector:
+            kha.io/pool: dynamo
+          tolerations:
+            - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+            - {key: kubernetes.azure.com/scalesetpriority, operator: Equal, value: spot, effect: NoSchedule}
+          volumes:
+            - name: model-cache
+              persistentVolumeClaim: {claimName: qwen3-model-cache}
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:${DYNAMO_VERSION}
+              workingDir: /workspace/examples/backends/vllm
+              command: ["python3", "-m", "dynamo.vllm"]
+              args:
+                - --model
+                - ${DYNAMO_MODEL}
+                - --max-model-len
+                - "8192"
+                - --gpu-memory-utilization
+                - "0.40"
+                - --enable-prefix-caching
+                - --kv-events-config
+                - '{"publisher":"zmq","topic":"kv-events","endpoint":"tcp://*:20080","enable_kv_cache_events":true}'
+              envFrom:
+                - secretRef: {name: hf-token-secret}
+              env:
+                - {name: HF_HOME, value: /home/dynamo/.cache/huggingface}
+              resources:
+                limits: {nvidia.com/gpu: "1"}
+              volumeMounts:
+                - {name: model-cache, mountPath: /home/dynamo/.cache/huggingface}

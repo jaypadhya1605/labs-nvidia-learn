@@ -1,0 +1,29 @@
+{{- if .Values.agent.enabled }}
+# `helm test`: one golden-set disruption end to end (agent -> engine + MCP tools) must come back policy-compliant.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Release.Name }}-test-disruption
+  labels: {{- include "ttg.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  {{- with .Values.imagePullSecrets }}
+  imagePullSecrets: {{- toYaml . | nindent 4 }}
+  {{- end }}
+  containers:
+    - name: post-disruption
+      image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag }}
+      command: ["python", "-c"]
+      args:
+        - |
+          import json, sys, httpx
+          r = httpx.post("http://{{ .Values.agent.name }}:{{ .Values.agent.port }}/v1/disruptions",
+                         json={"scenario_id": "{{ .Values.helmTest.scenarioId }}"}, timeout=300)
+          print(r.status_code, r.text[:2000])
+          body = r.json() if r.status_code == 200 else {}
+          sys.exit(0 if body.get("success") else 1)
+      securityContext: {{- include "ttg.securityContext" . | nindent 8 }}
+{{- end }}

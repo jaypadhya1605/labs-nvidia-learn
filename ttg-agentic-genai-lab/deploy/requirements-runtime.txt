@@ -1,0 +1,12 @@
+# Runtime image (deploy/Dockerfile): agent API + both MCP tool servers + the CPU mock engine. Pins = env/pins.env.
+# No torch, no CUDA: the GPU work happens in the engine containers (vLLM, SGLang, TensorRT-LLM, NIM).
+langgraph==1.2.16
+langchain-core==1.6.12
+langchain-mcp-adapters==0.3.2
+mcp==1.30.0
+openai==3.35.1
+fastapi==0.143.2
+uvicorn==0.53.0
+httpx==0.28.1
+pydantic==2.13.5
+pillow==12.3.0            # M8 only: vlm/ receipt path in the guest MCP server (TTG_VLM_BASE_URL)

@@ -1,0 +1,48 @@
+# 🔁 Lab 02's perf gate, per cluster: benchmark one preset at one level and fail on regression vs the committed baseline.
+# Uses OIDC (no long-lived cloud keys): Azure federated credential (AZURE_* secrets) or GCP Workload Identity Federation
+# (GCP_WIF_PROVIDER, GCP_SA vars). Repository variables: AZ_RG, AZ_AKS_NAME, GKE_CLUSTER, GCP_ZONE, GCP_PROJECT.
+name: perf-gate
+on:
+  workflow_dispatch:
+    inputs:
+      cluster: {description: "aks | gke", default: aks}
+      preset: {description: "bench preset", default: synth-600-200}
+      concurrency: {description: "single concurrency level", default: "32"}
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - if: inputs.cluster == 'aks'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - if: inputs.cluster == 'aks'
+        run: az aks get-credentials -g "${{ vars.AZ_RG }}" -n "${{ vars.AZ_AKS_NAME }}" --context plv-aks
+      - if: inputs.cluster == 'gke'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SA }}
+      - if: inputs.cluster == 'gke'
+        uses: google-github-actions/get-gke-credentials@v2
+        with: {cluster_name: "${{ vars.GKE_CLUSTER }}", location: "${{ vars.GCP_ZONE }}", project_id: "${{ vars.GCP_PROJECT }}"}
+      - if: inputs.cluster == 'gke'
+        run: kubectl config rename-context "$(kubectl config current-context)" plv-gke
+      - name: Benchmark
+        run: |
+          cp env/lab.env.example env/lab.env
+          bench/run_sweep.sh "${{ inputs.cluster }}" "${{ inputs.preset }}" "${{ inputs.concurrency }}"
+      - name: Gate against the cluster's baseline
+        run: |
+          CANDIDATE="$(ls -dt results/${{ inputs.cluster }}-${{ inputs.preset }}-*/c${{ inputs.concurrency }} | head -1)"
+          python3 bench/perf_gate.py --baseline "bench/baselines/${{ inputs.cluster }}-${{ inputs.preset }}-c${{ inputs.concurrency }}.json" \
+            --candidate "${CANDIDATE}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: perf-results, path: results/}

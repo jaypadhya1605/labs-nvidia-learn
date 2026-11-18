@@ -1,0 +1,104 @@
+# KHA recording rules + SLO alerts. Metric names cover both older and newer vLLM spellings.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: lfy-rules
+  namespace: monitoring
+  labels:
+    release: kps
+spec:
+  groups:
+    - name: lfy-llm-tenant.rules
+      interval: 30s
+      rules:
+        - record: lfy:llm_generation_tokens:rate1m
+          expr: sum by (namespace, service) (rate(vllm:generation_tokens_total[1m]))
+        - record: lfy:llm_prompt_tokens:rate1m
+          expr: sum by (namespace, service) (rate(vllm:prompt_tokens_total[1m]))
+        - record: lfy:llm_requests_success:rate1m
+          expr: sum by (namespace, service) (rate(vllm:request_success_total[1m]))
+        - record: lfy:llm_ttft_seconds:p95_5m
+          expr: histogram_quantile(0.95, sum by (le, namespace, service) (rate(vllm:time_to_first_token_seconds_bucket[5m])))
+        - record: lfy:llm_itl_seconds:p95_5m
+          expr: |
+            histogram_quantile(0.95, sum by (le, namespace, service) (rate(vllm:inter_token_latency_seconds_bucket[5m])))
+            or
+            histogram_quantile(0.95, sum by (le, namespace, service) (rate(vllm:time_per_output_token_seconds_bucket[5m])))
+        - record: lfy:llm_requests_waiting
+          expr: sum by (namespace, service) (vllm:num_requests_waiting)
+        - record: lfy:llm_requests_running
+          expr: sum by (namespace, service) (vllm:num_requests_running)
+        - record: lfy:llm_kv_cache_usage
+          expr: max by (namespace, service) (vllm:kv_cache_usage_perc) or max by (namespace, service) (vllm:gpu_cache_usage_perc)
+        - record: lfy:llm_prefix_cache_hit_ratio:5m
+          expr: |
+            sum by (namespace, service) (rate(vllm:prefix_cache_hits_total[5m]))
+            / clamp_min(sum by (namespace, service) (rate(vllm:prefix_cache_queries_total[5m])), 1)
+    - name: lfy-gpu-energy.rules
+      interval: 30s
+      rules:
+        # Device-level fields repeat on every MIG instance series -> max by UUID, never sum.
+        - record: lfy:gpu_power_watts
+          expr: max by (Hostname, UUID) (DCGM_FI_DEV_POWER_USAGE)
+        - record: lfy:gpu_avg_watts_from_energy:5m
+          expr: max by (Hostname, UUID) (rate(DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION[5m])) / 1000
+        - record: lfy:cluster_generated_tokens_per_joule:5m
+          expr: sum(rate(vllm:generation_tokens_total[5m])) / clamp_min(sum(lfy:gpu_avg_watts_from_energy:5m), 1)
+        - record: lfy:mig_instance_gr_engine_active
+          expr: avg by (Hostname, UUID, GPU_I_PROFILE, GPU_I_ID, namespace, pod) (DCGM_FI_PROF_GR_ENGINE_ACTIVE)
+        - record: lfy:gpu_dram_active
+          expr: avg by (Hostname, UUID, GPU_I_PROFILE, GPU_I_ID, namespace, pod) (DCGM_FI_PROF_DRAM_ACTIVE)
+    - name: lfy-slo.alerts
+      rules:
+        - alert: LFYAgentLLMTTFTSLOBreach
+          expr: lfy:llm_ttft_seconds:p95_5m{namespace="lfy-agent"} > 1.0
+          for: 10m
+          labels: {severity: page, tenant: soc-agent}
+          annotations:
+            summary: "Agent LLM TTFT p95 above 1.0 s for 10 minutes"
+            runbook: "drills/README.md"
+        - alert: LFYSafetyQueueBacklog
+          expr: lfy:llm_requests_waiting{namespace="lfy-safety"} > 16
+          for: 5m
+          labels: {severity: ticket, tenant: safety}
+          annotations:
+            summary: "Safety model has more than 16 queued checks for 5 minutes - every guarded call is waiting on it"
+        - alert: LFYGpuXidError
+          expr: max by (Hostname, UUID) (DCGM_FI_DEV_XID_ERRORS) > 0
+          for: 1m
+          labels: {severity: page}
+          annotations:
+            summary: "GPU reported an XID error; check driver logs and nvidia-smi on the node"
+    - name: lfy-agent-safety.rules
+      interval: 30s
+      rules:
+        - record: lfy:guardrail_block_rate:5m
+          expr: sum(rate(guardrail_requests_total{outcome="blocked"}[5m])) / clamp_min(sum(rate(guardrail_requests_total[5m])), 1e-9)
+        - record: lfy:guardrail_blocks_by_rail:rate5m
+          expr: sum by (rail) (rate(guardrail_rail_stops_total[5m]))
+        - record: lfy:guardrail_latency_seconds:p95_5m
+          expr: histogram_quantile(0.95, sum by (le) (rate(guardrail_latency_seconds_bucket[5m])))
+        - record: lfy:agent_triage_latency_seconds:p95_5m
+          expr: histogram_quantile(0.95, sum by (le, mode) (rate(agent_triage_latency_seconds_bucket[5m])))
+        - record: lfy:agent_tool_calls:rate5m
+          expr: sum by (tool, mode) (rate(agent_tool_calls_total[5m]))
+    - name: lfy-security.alerts
+      rules:
+        - alert: LFYGuardrailFailClosed
+          expr: sum(rate(guardrail_errors_total[5m])) > 0
+          for: 5m
+          labels: {severity: page, tenant: safety}
+          annotations:
+            summary: "Guarded gateway is refusing requests because a safety model call is failing (fail-closed engaged)"
+        - alert: LFYPromptInjectionInTelemetry
+          expr: sum(increase(agent_injection_detected_total[10m])) > 0
+          for: 1m
+          labels: {severity: ticket, tenant: soc-agent}
+          annotations:
+            summary: "Prompt-injection text found inside security telemetry - treat it as an indicator of compromise"
+        - alert: LFYAgentPolicyDenials
+          expr: sum(increase(agent_policy_denials_total[10m])) > 5
+          for: 1m
+          labels: {severity: ticket, tenant: soc-agent}
+          annotations:
+            summary: "The agent repeatedly attempted actions or queries its policy forbids"

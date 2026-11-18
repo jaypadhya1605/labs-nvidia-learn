@@ -1,0 +1,27 @@
+# AKS (Azure) - 1x A100 80GB PCIe, Spot. The diff between this file and clusters/gke/values.yaml IS the
+# "porting cost" of the product: storage, scheduling, precision. Everything else is identical.
+cloud: aks
+llm:
+  precision: bf16                          # Ampere: no FP8 tensor cores
+  profile: "vllm-bf16-tp1-pp1-feat_lora"   # M4: replace with the exact LoRA profile from list-model-profiles on THIS GPU
+  gpuResource: nvidia.com/gpu              # M8 switches to nvidia.com/mig-3g.40gb (🔁 Lab 02 MIG) to free a slice for training
+  cache:
+    mode: nimcache                         # shared RWX cache: replicas and restarts skip the 16 GB download
+    storageClass: azurefile-csi-premium
+    size: 100Gi
+    accessMode: ReadWriteMany
+  tolerations:
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+    - {key: kubernetes.azure.com/scalesetpriority, operator: Equal, value: spot, effect: NoSchedule}
+  lora:
+    adapters: []                           # M8 adds plover-style-v1 here (a Git commit = a release)
+api:
+  routing:
+    stableModel: ""
+    canaryModel: ""
+    canaryWeight: 0
+bench:
+  toolbox:
+    enabled: true
+networkPolicy:
+  allowNamespaces: [plv-mlops]             # M8: dataset + eval-gate jobs call the NIM from the MLOps namespace

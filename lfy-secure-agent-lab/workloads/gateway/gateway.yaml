@@ -1,0 +1,78 @@
+# Guarded gateway. The init container copies the policy bundle and - after M11 - refuses to start if its signature
+# does not verify: an unsigned or tampered safety policy never reaches production.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guarded-gateway
+  namespace: lfy-safety
+  labels: {app: guarded-gateway}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: guarded-gateway}
+  template:
+    metadata:
+      labels: {app: guarded-gateway}
+    spec:
+      initContainers:
+        - name: verify-policy
+          image: ${ACR_LOGIN_SERVER}/lfy/guarded-gateway:${APP_TAG}
+          command: ["bash", "/app/verify_bundle.sh", "/bundle", "/work/config", "/sig/guardrails-config.sig"]
+          env:
+            - name: REQUIRE_SIGNATURE
+              valueFrom: {configMapKeyRef: {name: lfy-signing, key: require_signature, optional: true}}
+          volumeMounts:
+            - {name: bundle, mountPath: /bundle}
+            - {name: work, mountPath: /work}
+            - {name: sig, mountPath: /sig}
+            - {name: pubkey, mountPath: /keys}
+      containers:
+        - name: gateway
+          image: ${ACR_LOGIN_SERVER}/lfy/guarded-gateway:${APP_TAG}
+          env:
+            - {name: GUARDRAILS_CONFIG, value: /work/config}
+            - {name: FAIL_MODE, value: "${FAIL_MODE}"}
+            - {name: MAIN_LLM_URL, value: "http://triage-llm.lfy-agent.svc:8000/v1/chat/completions"}
+            - {name: SERVED_MODEL_NAME, value: "${NIM_LLM_MODEL}"}
+          ports:
+            - {name: http, containerPort: 8080}
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8080}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: {cpu: "1", memory: 3Gi}
+            limits: {cpu: "3", memory: 6Gi}
+          volumeMounts:
+            - {name: work, mountPath: /work, readOnly: true}
+      volumes:
+        - name: bundle
+          configMap: {name: guardrails-config}
+        - name: work
+          emptyDir: {}
+        - name: sig
+          configMap: {name: lfy-signatures, optional: true}
+        - name: pubkey
+          configMap: {name: lfy-signing, optional: true}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: guarded-gateway
+  namespace: lfy-safety
+  labels: {app: guarded-gateway}
+spec:
+  selector: {app: guarded-gateway}
+  ports:
+    - {name: http, port: 8080, targetPort: 8080}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: guarded-gateway
+  namespace: lfy-safety
+spec:
+  selector:
+    matchLabels: {app: guarded-gateway}
+  endpoints:
+    - {port: http, path: /metrics, interval: 15s}

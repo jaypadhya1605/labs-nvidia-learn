@@ -1,0 +1,33 @@
+# M5: Triton perf_analyzer sweep against the TensorRT engine, using real tokenized samples.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: triage-perf
+  namespace: kha-shared
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: perf
+          image: nvcr.io/nvidia/tritonserver:${NGC_RELEASE}-py3-sdk
+          command: ["bash", "-c"]
+          args:
+            - |
+              set -e
+              perf_analyzer -m triage_trt -u triage-triton.kha-shared.svc:8001 -i grpc \
+                --shape input_ids:128 --shape attention_mask:128 \
+                --input-data /models/triage/perf_data.json \
+                --concurrency-range 1:32:4 --measurement-interval 5000 \
+                -f /models/triage/perf_analyzer.csv
+              echo "--- perf_analyzer CSV ---"; cat /models/triage/perf_analyzer.csv
+              echo "--- PyTorch eager baseline (training job) ---"; cat /models/triage/pytorch_baseline.json || true
+              echo "--- validation metrics ---"; cat /models/triage/metrics.json || true
+          resources:
+            requests: {cpu: "1", memory: 1Gi}
+          volumeMounts:
+            - {name: models, mountPath: /models}
+      volumes:
+        - name: models
+          persistentVolumeClaim: {claimName: triage-models}

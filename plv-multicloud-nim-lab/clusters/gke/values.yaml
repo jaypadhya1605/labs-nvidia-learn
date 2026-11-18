@@ -1,0 +1,21 @@
+# GKE (Google Cloud) - 1x RTX PRO 6000 Blackwell Server Edition 96GB (G4), Spot.
+cloud: gke
+llm:
+  precision: bf16                          # same precision as AKS for the apples-to-apples PoC; M6 sweeps fp8 + nvfp4
+  profile: "vllm-bf16-tp1-pp1-feat_lora"   # M4: replace with the exact profile from list-model-profiles on THIS GPU
+  gpuResource: nvidia.com/gpu
+  cache:
+    mode: emptydir                         # Filestore's 1 TiB minimum is too costly for a lab - each pod downloads (ADR-05)
+    emptyDirSizeLimit: 120Gi
+  tolerations:
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  lora:
+    adapters: []
+api:
+  routing:
+    stableModel: ""
+    canaryModel: ""
+    canaryWeight: 0
+bench:
+  toolbox:
+    enabled: true

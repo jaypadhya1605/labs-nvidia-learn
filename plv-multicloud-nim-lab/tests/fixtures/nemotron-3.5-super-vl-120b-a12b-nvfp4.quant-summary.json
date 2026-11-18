@@ -1,0 +1,51 @@
+{
+ "quant_method": "modelopt_mixed",
+ "quant_algo": "MIXED_PRECISION",
+ "kv_cache_scheme": {
+  "dynamic": false,
+  "num_bits": 8,
+  "type": "float"
+ },
+ "layers_by_module": {
+  "in_proj": {
+   "FP8": 40
+  },
+  "out_proj": {
+   "FP8": 40
+  },
+  "experts": {
+   "NVFP4": 40960
+  },
+  "shared_experts": {
+   "NVFP4": 80
+  },
+  "k_proj": {
+   "FP8": 8
+  },
+  "o_proj": {
+   "FP8": 8
+  },
+  "q_proj": {
+   "FP8": 8
+  },
+  "v_proj": {
+   "FP8": 8
+  },
+  "lm_head": {
+   "FP8": 1
+  }
+ },
+ "kept_high_precision": {
+  "fc1_latent_proj": 41,
+  "fc2_latent_proj": 41,
+  "gate": 41,
+  "conv1d": 40,
+  "*": 3,
+  "embeddings": 1,
+  "eh_proj": 1,
+  "k_proj": 1,
+  "o_proj": 1,
+  "q_proj": 1,
+  "v_proj": 1
+ }
+}

@@ -1,0 +1,43 @@
+# M10: download Qwen3-8B once into an RWX volume shared by every Dynamo worker (no per-pod downloads).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qwen3-model-cache
+  namespace: kha-dynamo
+spec:
+  accessModes: [ReadWriteMany]
+  storageClassName: azurefile-csi-premium
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: qwen3-download
+  namespace: kha-dynamo
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: download
+          image: python:3.12-slim
+          command: ["bash", "-c"]
+          args:
+            - |
+              set -e
+              pip install -q -U huggingface_hub
+              python3 -c "from huggingface_hub import snapshot_download as d; print('cached at', d('${DYNAMO_MODEL}'))"
+              # H100 option for the TRT-LLM FP8 run: also download nvidia/Qwen3-8B-FP8
+          env:
+            - {name: HF_HOME, value: /cache}
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef: {name: hf-token-secret, key: HF_TOKEN, optional: true}
+          volumeMounts:
+            - {name: cache, mountPath: /cache}
+      volumes:
+        - name: cache
+          persistentVolumeClaim: {claimName: qwen3-model-cache}

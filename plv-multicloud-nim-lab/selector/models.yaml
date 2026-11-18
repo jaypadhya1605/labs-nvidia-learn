@@ -1,0 +1,19 @@
+# Model facts for the selector. Dense: params_active = params_total. MoE / hybrid Mamba: generate the architecture
+# fields with selector/model_sizer.py from config.json (never by hand). kv_layers = attention layers only.
+#   kv_bytes            KV-cache bytes per element: number, or a map by precision (FP8-KV checkpoints use 1)
+#   extra_weights_gb    bytes NOT captured by params_total x precision (layers kept in BF16/FP8, vision tower, MTP head)
+#   mamba_state_mb_per_seq  fixed SSM + conv state per sequence (read AND written every decode step)
+#   nim_verified_gpus   GPUs this model's NIM is verified on (support matrix) - "verified" is per model, not per GPU
+llama-3.1-8b:
+  params_total_b: 8.03
+  params_active_b: 8.03
+  kv_layers: 32
+  kv_heads: 8
+  head_dim: 128
+  kv_bytes: 2
+  nim_precisions: [bf16, fp8, nvfp4]
+  mamba_state_mb_per_seq: 0
+  moe_experts: null
+  moe_active_experts: null
+  nim_verified_gpus: [L40S, A100-40GB, A100-80GB-SXM, H100-SXM, H100-NVL, RTX-PRO-6000-BSE]   # NIM LLM 2.0.13 support matrix
+  source: "Llama 3.1 8B config.json; NIM 2.0.13 support matrix (A100 PCIe is NOT on the verified list)"

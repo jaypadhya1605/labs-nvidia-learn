@@ -1,0 +1,63 @@
+# M5: serve the TensorRT engine with Triton Inference Server on the second 1g slice.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: triage-triton
+  namespace: kha-shared
+  labels: {app: triage-triton}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: triage-triton}
+  template:
+    metadata:
+      labels: {app: triage-triton, kha.io/tenant: shared-services}
+    spec:
+      nodeSelector: {kha.io/pool: mig}
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: kubernetes.azure.com/scalesetpriority, operator: Equal, value: spot, effect: NoSchedule}
+      containers:
+        - name: triton
+          image: nvcr.io/nvidia/tritonserver:${NGC_RELEASE}-py3
+          command: ["tritonserver"]
+          args: ["--model-repository=/models/triage/model_repository", "--log-verbose=0"]
+          ports:
+            - {name: http, containerPort: 8000}
+            - {name: grpc, containerPort: 8001}
+            - {name: metrics, containerPort: 8002}
+          readinessProbe:
+            httpGet: {path: /v2/health/ready, port: 8000}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            limits: {${MIG_SMALL}: 1}
+          volumeMounts:
+            - {name: models, mountPath: /models, readOnly: true}
+      volumes:
+        - name: models
+          persistentVolumeClaim: {claimName: triage-models}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: triage-triton
+  namespace: kha-shared
+  labels: {app: triage-triton}
+spec:
+  selector: {app: triage-triton}
+  ports:
+    - {name: http, port: 8000, targetPort: 8000}
+    - {name: grpc, port: 8001, targetPort: 8001}
+    - {name: metrics, port: 8002, targetPort: 8002}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: triage-triton
+  namespace: kha-shared
+spec:
+  selector:
+    matchLabels: {app: triage-triton}
+  endpoints:
+    - {port: metrics, interval: 15s}

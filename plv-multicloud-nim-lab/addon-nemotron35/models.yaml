@@ -1,0 +1,52 @@
+# Nemotron 3.5 (released 2026-10-15) for selector/instance_selector.py --models-file addon-nemotron35/models.yaml
+# Architecture fields: selector/model_sizer.py on the real config.json files (tests/fixtures/, from Hugging Face).
+# Sizes: Hugging Face checkpoint sizes (2026-10-15) - total bytes are the truth, parameter counts on cards are rounded.
+# nim_verified_gpus is "unknown" on purpose: check the NIM support matrix for YOUR NIM version before quoting a GPU.
+nemotron-3.5-lightning:            # NIM image: nvcr.io/nim/nvidia/nemotron-3.5-lightning-30b-a3b (docs: 2.0.9-variant)
+  params_total_b: 32.9             # BF16 checkpoint 65.83 GB / 2 bytes (card: "30B-A3B"; includes the MTP head)
+  params_active_b: 3.0
+  kv_layers: 6                     # 52 layers = 23 Mamba-2 + 23 MoE + 6 attention
+  kv_heads: 2
+  head_dim: 128
+  kv_bytes: 2
+  extra_weights_gb: {nvfp4: 1.3, w4a16: 1.3, bf16: 0}   # layers kept above 4-bit; NIM docs: NVFP4 cache ~19 GB
+  mamba_state_mb_per_seq: 49.1     # fp32 SSM state (mamba_ssm_cache_dtype) + conv state
+  moe_experts: 128
+  moe_active_experts: 6
+  max_context: 262144              # config + NIM docs (native 256K; longer needs VLLM_ALLOW_LONG_MAX_MODEL_LEN)
+  nim_precisions: [bf16, w4a16, nvfp4]
+  nim_profiles: "bf16 TP1/2/4/8, w4a16 TP1/2/4, nvfp4 TP1/2/4 - each with and without LoRA (NIM 2.0.13 matrix)"
+  nim_verified_gpus: unknown
+  source: "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 config.json"
+nemotron-3.5-super-vl:             # NIM model id: nemotron-3.5-super-vl-120b-a12b (image name: verify in NGC)
+  params_total_b: 121              # language backbone (NeMo AutoModel model page; 124B incl. MTP head)
+  params_active_b: 12
+  kv_layers: 8                     # 88 layers = 40 Mamba-2 + 40 latent-MoE + 8 attention
+  kv_heads: 2
+  head_dim: 128
+  kv_bytes: {default: 2, nvfp4: 1} # the NVFP4 checkpoint ships an FP8 KV-cache scheme
+  extra_weights_gb: 6.9            # NVFP4 ckpt 75.01 GB - 121 x 0.5625 (FP8 Mamba/attention, BF16 embeddings, RADIO vision, MTP)
+  mamba_state_mb_per_seq: 170.2
+  moe_experts: 512
+  moe_active_experts: 22
+  max_context: 1048576             # config max_position_embeddings - verify what the NIM profile serves
+  nim_precisions: [bf16, nvfp4]
+  nim_profiles: "nvfp4 TP1/TP2 (no LoRA); bf16 TP2/4/8 (LoRA) (NIM 2.0.13 matrix)"
+  nim_verified_gpus: unknown
+  source: "nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-{BF16,NVFP4} config.json + checkpoint sizes"
+nemotron-3.5-bolt-24gb:            # workstation/edge model - GGUF-style runtimes (llama.cpp, Ollama, LM Studio, vLLM), not NIM
+  params_total_b: 74
+  params_active_b: 9
+  kv_layers: 8                     # Puzzle-pruned Super: 88 layers, 240-496 experts per layer, top-9
+  kv_heads: 2
+  head_dim: 128
+  kv_bytes: 2
+  extra_weights_gb: {iq2: 5.0}     # 24.08 GB checkpoint - 74 x 0.258 (experts IQ2_XXS; Mamba proj NVFP4; attention Q8_0; vision BF16)
+  mamba_state_mb_per_seq: 170.2
+  moe_experts: 345.6
+  moe_active_experts: 9
+  max_context: 262144
+  nim_precisions: [iq2]
+  nim_profiles: "none (2026-10-15)"
+  nim_verified_gpus: unknown
+  source: "nvidia/NVIDIA-Nemotron-3.5-Bolt-74B-A9B-24GB config.json (quantization_config: modelopt 0.37.0 MIXED_PRECISION)"

@@ -1,0 +1,4 @@
+# Rendered by scripts/render-cluster-config.sh - per-owner values (no secrets).
+api:
+  image:
+    repository: ghcr.io/${GITHUB_OWNER_LC}/plover-api

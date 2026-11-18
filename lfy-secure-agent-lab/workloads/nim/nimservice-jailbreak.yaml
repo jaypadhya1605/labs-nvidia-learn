@@ -1,0 +1,45 @@
+# NemoGuard JailbreakDetect on a 1g slice. Not every NIM uses NIMCache: this one downloads into its own PVC.
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: jailbreak-detect
+  namespace: lfy-safety
+spec:
+  userID: 1000
+  groupID: 0
+  image:
+    repository: ${NIM_JAILBREAK_IMAGE}
+    tag: "${NIM_JAILBREAK_TAG}"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    pvc:
+      create: true
+      storageClass: azurefile-csi
+      size: 20Gi
+      volumeAccessMode: ReadWriteMany
+
+  replicas: 1
+  resources:
+    limits:
+      ${MIG_SMALL}: 1
+  nodeSelector:
+    kha.io/pool: mig
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+  metrics:
+    enabled: false
+    serviceMonitor:
+      interval: 15s

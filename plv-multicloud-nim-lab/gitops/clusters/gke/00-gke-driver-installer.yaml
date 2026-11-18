@@ -1,0 +1,24 @@
+# Google's COS driver installer, pinned to a commit (reproducible) - installs the newest driver for the node's
+# COS version (G4 / RTX PRO 6000 needs >= 580). Must run before the GPU Operator touches the node.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gke-driver-installer
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/GoogleCloudPlatform/container-engine-accelerators.git
+    targetRevision: 5b774eea3ddaf3afea8f9968de512db0c80ef5a9
+    path: nvidia-driver-installer/cos
+    directory:
+      include: "daemonset-preloaded-latest.yaml"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -1,0 +1,5 @@
+# External Secrets Operator: the same ExternalSecret objects on every cloud; only the ClusterSecretStore differs.
+installCRDs: true
+serviceAccount:
+  create: true
+  name: external-secrets

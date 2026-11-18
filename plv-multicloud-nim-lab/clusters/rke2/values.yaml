@@ -1,0 +1,19 @@
+# RKE2 "data center in a box" (M9) - air-gapped. No operator for the LLM, no cloud secret manager, no Internet:
+# images resolve through RKE2's registry mirror (same image names!), the model comes from a pre-filled host cache.
+cloud: rke2
+secrets:
+  mode: existing
+llm:
+  mode: deployment
+  precision: bf16
+  profile: "vllm-bf16-tp1-pp1"             # the profile you ran download-to-cache for (datacenter/prefetch-model.sh)
+  gpuResource: nvidia.com/gpu
+  cache:
+    mode: hostpath
+    hostPath: /opt/nim-cache
+  lora:
+    enabled: false
+  nodeSelector: {}
+  tolerations: []
+serviceMonitor:
+  enabled: false

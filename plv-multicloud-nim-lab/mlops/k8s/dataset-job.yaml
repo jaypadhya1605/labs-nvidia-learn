@@ -1,0 +1,26 @@
+# M8 step 1 in-cluster: the teacher (base NIM + style guide) labels 800 synthetic cases -> /data/mlops/{train,val}.jsonl
+#   kubectl -n plv-mlops create configmap plover-mlops-code --from-file=mlops/ --from-file=app/plover_api/ --from-file=tests/mock_openai.py
+apiVersion: batch/v1
+kind: Job
+metadata: {name: plover-dataset, namespace: plv-mlops}
+spec:
+  backoffLimit: 0
+  template:
+    metadata: {labels: {app: plover-dataset}}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: dataset
+          image: python:3.12-slim
+          command: ["bash", "-c"]
+          args:
+            - pip install -q httpx fastapi &&
+              mkdir -p /work/app/plover_api /work/mlops /work/tests &&
+              cp /code/*.py /work/mlops/ && cp /code/synth.py /code/prompts.py /code/schema.py /work/app/plover_api/ &&
+              touch /work/app/plover_api/__init__.py && cp /code/mock_openai.py /work/tests/ &&
+              python3 /work/mlops/make_dataset.py --endpoint http://plover-llm.plv-serving.svc:8000 --n 800 --out /data/mlops
+          resources: {requests: {cpu: 500m, memory: 512Mi}}
+          volumeMounts: [{name: data, mountPath: /data}, {name: code, mountPath: /code}]
+      volumes:
+        - {name: data, persistentVolumeClaim: {claimName: plv-mlops-data}}
+        - {name: code, configMap: {name: plover-mlops-code}}

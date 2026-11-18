@@ -1,0 +1,15 @@
+# GPU facts for the instance selector. Dense (non-sparse) tensor TFLOPS; bandwidth = peak memory bandwidth.
+# null TFLOPS = the GPU has no tensor-core path for that format (e.g. FP8 on Ampere, NVFP4 before Blackwell).
+# "verify: true" = derived or partner-reported; check the datasheet before quoting it to a customer.
+# Which GPUs a NIM is VERIFIED on is a property of the MODEL - see nim_verified_gpus in models.yaml.
+T4:               {mem_gb: 16, bw_gbps: 320,  bf16_tflops: null, fp16_tflops: 65,  fp8_tflops: null, fp4_tflops: null, arch: turing,    sm: 75}
+L4:               {mem_gb: 24, bw_gbps: 300,  bf16_tflops: 121,  fp8_tflops: 242,  fp4_tflops: null, arch: ada,       sm: 89}
+A10:              {mem_gb: 24, bw_gbps: 600,  bf16_tflops: 125,  fp8_tflops: null, fp4_tflops: null, arch: ampere,    sm: 86}
+A10G:             {mem_gb: 24, bw_gbps: 600,  bf16_tflops: 70,   fp8_tflops: null, fp4_tflops: null, arch: ampere,    sm: 86, verify: true}
+L40S:             {mem_gb: 48, bw_gbps: 864,  bf16_tflops: 362,  fp8_tflops: 733,  fp4_tflops: null, arch: ada,       sm: 89}
+A100-40GB:        {mem_gb: 40, bw_gbps: 1555, bf16_tflops: 312,  fp8_tflops: null, fp4_tflops: null, arch: ampere,    sm: 80}
+A100-80GB-PCIe:   {mem_gb: 80, bw_gbps: 1935, bf16_tflops: 312,  fp8_tflops: null, fp4_tflops: null, arch: ampere,    sm: 80}
+A100-80GB-SXM:    {mem_gb: 80, bw_gbps: 2039, bf16_tflops: 312,  fp8_tflops: null, fp4_tflops: null, arch: ampere,    sm: 80}
+H100-SXM:         {mem_gb: 80, bw_gbps: 3350, bf16_tflops: 989,  fp8_tflops: 1979, fp4_tflops: null, arch: hopper,    sm: 90}
+H100-NVL:         {mem_gb: 94, bw_gbps: 3900, bf16_tflops: 835,  fp8_tflops: 1671, fp4_tflops: null, arch: hopper,    sm: 90}
+RTX-PRO-6000-BSE: {mem_gb: 96, bw_gbps: 1597, bf16_tflops: 500,  fp8_tflops: 1000, fp4_tflops: 2000, arch: blackwell, sm: 120, verify: true}

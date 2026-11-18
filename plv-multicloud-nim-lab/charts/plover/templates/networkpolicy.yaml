@@ -1,0 +1,23 @@
+{{- if .Values.networkPolicy.enabled }}
+# Ingress only from inside this namespace and from monitoring (metrics). Enforced by Cilium (AKS),
+# Dataplane V2 (GKE), and on EKS/OKE only if you install a policy engine (docs/07-csp-cheatsheet.md).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: plover-ingress
+  labels: {{- include "plover.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+        {{- range .Values.networkPolicy.allowNamespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+        {{- end }}
+{{- end }}

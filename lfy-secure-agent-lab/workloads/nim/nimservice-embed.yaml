@@ -1,0 +1,43 @@
+# Lab 02's policy-embed, now retrieving SOC playbooks for the agent.
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: agent-embed
+  namespace: lfy-agent
+spec:
+  userID: 1000
+  groupID: 0
+  image:
+    repository: ${NIM_EMBED_IMAGE}
+    tag: "${NIM_EMBED_TAG}"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: agent-embed
+      profile: ''
+
+  replicas: 1
+  resources:
+    limits:
+      ${MIG_SMALL}: 1
+  nodeSelector:
+    kha.io/pool: mig
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+  metrics:
+    enabled: true
+    serviceMonitor:
+      interval: 15s

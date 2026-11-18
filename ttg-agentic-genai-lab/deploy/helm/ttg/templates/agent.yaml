@@ -1,0 +1,82 @@
+{{- if .Values.agent.enabled }}
+{{- $a := .Values.agent }}
+# The Disruption Concierge: LangGraph agent behind a FastAPI service. It talks to the engine (OpenAI API) and to the
+# two MCP tool servers over streamable HTTP - the same code path as `TTG_MCP_MODE=http` on the laptop.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $a.name }}
+  labels: {{- include "ttg.labels" . | nindent 4 }}
+spec:
+  {{- if not $a.autoscaling.enabled }}
+  replicas: {{ $a.replicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ $a.name }}
+  template:
+    metadata:
+      labels: {{- include "ttg.podLabels" (dict "name" $a.name "component" "agent") | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: agent
+          image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["uvicorn", "ttg.agent.api:app", "--host", "0.0.0.0", "--port", {{ $a.port | quote }}]
+          env:
+            - {name: TTG_BASE_URL, value: {{ include "ttg.agentBaseUrl" . | quote }}}
+            - {name: TTG_MODEL, value: {{ include "ttg.agentModel" . | quote }}}
+            {{- if $a.apiKeySecret.name }}
+            - name: TTG_API_KEY
+              valueFrom: {secretKeyRef: {name: {{ $a.apiKeySecret.name }}, key: {{ $a.apiKeySecret.key }}}}
+            {{- else }}
+            - {name: TTG_API_KEY, value: "not-used"}
+            {{- end }}
+            - {name: TTG_PROMPT_VARIANT, value: {{ include "ttg.agentPromptVariant" . | quote }}}
+            - {name: TTG_THOUGHTS, value: {{ $a.thoughts | quote }}}
+            - {name: TTG_STRUCTURED, value: {{ $a.structured | quote }}}
+            - {name: TTG_BUST_CACHE, value: {{ if $a.bustCache }}"1"{{ else }}"0"{{ end }}}
+            - {name: TTG_MAX_STEPS, value: {{ $a.maxSteps | quote }}}
+            - {name: TTG_MAX_TOKENS, value: {{ $a.maxTokens | quote }}}
+            - {name: TTG_TEMPERATURE, value: {{ $a.temperature | quote }}}
+            - {name: TTG_TIMEOUT_S, value: {{ $a.timeoutS | quote }}}
+            - {name: TTG_TOOL_TIMEOUT_S, value: {{ $a.toolTimeoutS | quote }}}
+            - {name: TTG_MCP_MODE, value: "http"}
+            - {name: TTG_MCP_OPS_URL, value: {{ printf "http://%s:%d/mcp" .Values.mcp.ops.name (int .Values.mcp.ops.port) | quote }}}
+            - {name: TTG_MCP_GUEST_URL, value: {{ printf "http://%s:%d/mcp" .Values.mcp.guest.name (int .Values.mcp.guest.port) | quote }}}
+            - {name: TTG_TRACE_DIR, value: /tmp/traces}
+            {{- with $a.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - {name: http, containerPort: {{ $a.port }}}
+          readinessProbe:
+            httpGet: {path: {{ $a.healthPath }}, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: {{ $a.healthPath }}, port: http}
+            periodSeconds: 20
+            failureThreshold: 3
+          resources: {{- toYaml $a.resources | nindent 12 }}
+          securityContext: {{- include "ttg.securityContext" . | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 1Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $a.name }}
+  labels: {{- include "ttg.labels" . | nindent 4 }}
+    app: {{ $a.name }}
+spec:
+  selector:
+    app: {{ $a.name }}
+  ports:
+    - {name: http, port: {{ $a.port }}, targetPort: http}
+{{- end }}

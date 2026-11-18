@@ -1,0 +1,25 @@
+# M8 add-on: a SECOND release of this chart that serves the receipt VLM next to the agent's LLM (engine only).
+# Layer it on the cluster file; it needs a second GPU (the LLM release keeps its own):
+#   helm upgrade --install ttg-vlm deploy/helm/ttg -n ttg -f deploy/values/gke.yaml -f deploy/values/vlm-addon.yaml \
+#     --wait --timeout 45m
+#   helm upgrade --install ttg deploy/helm/ttg -n ttg -f deploy/values/gke.yaml --reuse-values \
+#     --set mcp.guest.vlm.baseUrl=http://ttg-vlm:8000/v1 --set mcp.guest.vlm.model=ttg-vlm
+# Same engine flags as `engines/launch.sh vllm vlm`. The receipts are baked into the image (deploy/Dockerfile).
+secrets:
+  mode: existing                     # reuse the Secrets the main release's ExternalSecrets own (no duplicate owners)
+engine:
+  name: ttg-vlm
+  kind: vllm
+  variant: base
+  model: Qwen/Qwen2.5-VL-7B-Instruct
+  servedModelName: ttg-vlm
+  maxModelLen: 32768
+  extraArgs: ["--limit-mm-per-prompt", "{\"image\":2}"]
+  autoscaling: {enabled: false}
+agent:
+  enabled: false
+mcp:
+  enabled: false
+networkPolicy:
+  enabled: true
+  engineClients: [ttg-mcp-guest]     # the main release's guest MCP server is this engine's only caller

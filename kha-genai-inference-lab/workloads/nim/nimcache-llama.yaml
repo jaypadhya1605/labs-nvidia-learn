@@ -1,0 +1,58 @@
+# Pre-download ONLY the vLLM profile we will serve (engine + precision + TP=1, no LoRA) into an RWX PVC per tenant.
+# NIM LLM 2.x (PB6) profiles are vLLM-only: vllm-<bf16|fp8|nvfp4>-tp1-pp1.
+# groupID 0 is required for PB6 images (otherwise CrashLoop on update-ca-certificates).
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: llama-3-1-8b
+  namespace: kha-um
+spec:
+  userID: 1000
+  groupID: 0
+  source:
+    ngc:
+      modelPuller: ${NIM_LLM_IMAGE}:${NIM_LLM_TAG}
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+        engine: vllm
+        precision: ${LLM_PRECISION}
+        tensorParallelism: "1"
+        lora: false
+  storage:
+    pvc:
+      create: true
+      storageClass: azurefile-csi-premium
+      size: 100Gi
+      volumeAccessMode: ReadWriteMany
+  resources:
+    cpu: "2"
+    memory: 8Gi
+---
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: llama-3-1-8b
+  namespace: kha-shared
+spec:
+  userID: 1000
+  groupID: 0
+  source:
+    ngc:
+      modelPuller: ${NIM_LLM_IMAGE}:${NIM_LLM_TAG}
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+        engine: vllm
+        precision: ${LLM_PRECISION}
+        tensorParallelism: "1"
+        lora: false
+  storage:
+    pvc:
+      create: true
+      storageClass: azurefile-csi-premium
+      size: 100Gi
+      volumeAccessMode: ReadWriteMany
+  resources:
+    cpu: "2"
+    memory: 8Gi

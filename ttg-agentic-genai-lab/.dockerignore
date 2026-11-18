@@ -1,0 +1,10 @@
+# Same allow-list as deploy/Dockerfile.dockerignore. BuildKit reads that file; kaniko (the GitLab build job) only
+# reads .dockerignore at the context root - without this file kaniko would send results/, .venv and adapters/ along.
+**
+!deploy/requirements-runtime.txt
+!deploy/Dockerfile
+!ttg/**
+!data/policies/**
+!vlm/**
+**/__pycache__
+**/*.pyc

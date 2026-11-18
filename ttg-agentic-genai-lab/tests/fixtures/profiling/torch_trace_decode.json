@@ -1,0 +1,481 @@
+{
+ "schemaVersion": 1,
+ "deviceProperties": [
+  {
+   "id": 0,
+   "name": "NVIDIA H100 80GB HBM3",
+   "totalGlobalMem": 85045411840
+  }
+ ],
+ "traceName": "synthetic fixture: two CUDA-graph decode steps of Llama-3.1-8B on vLLM (names from real traces, timings invented)",
+ "traceEvents": [
+  {
+   "ph": "X",
+   "cat": "cpu_op",
+   "name": "aten::mm",
+   "pid": 1234,
+   "tid": 1234,
+   "ts": 900.0,
+   "dur": 5.0
+  },
+  {
+   "ph": "X",
+   "cat": "cuda_runtime",
+   "name": "cudaGraphLaunch",
+   "pid": 1234,
+   "tid": 1234,
+   "ts": 980.0,
+   "dur": 4.0
+  },
+  {
+   "ph": "X",
+   "cat": "cuda_runtime",
+   "name": "cudaLaunchKernel",
+   "pid": 1234,
+   "tid": 1234,
+   "ts": 988.0,
+   "dur": 3.0
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "sm90_xmma_gemm_bf16bf16_bf16f32_f32_tn_n_tilesize128x128x64_warpgroupsize1x1x1_execute_segment_k_off_kernel__5x_cublas",
+   "pid": 0,
+   "tid": 7,
+   "ts": 1000.0,
+   "dur": 120.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 0
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "gpu_memset",
+   "name": "Memset (Device)",
+   "pid": 0,
+   "tid": 13,
+   "ts": 1010.0,
+   "dur": 4.0,
+   "args": {
+    "device": 0,
+    "stream": 13
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "void vllm::rotary_embedding_kernel<c10::BFloat16, true>(long const*, c10::BFloat16*, c10::BFloat16*, c10::BFloat16 const*, int, long, long, int, int, int)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 1122.0,
+   "dur": 8.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 1
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "void vllm::reshape_and_cache_flash_kernel<__nv_bfloat16, __nv_bfloat16, (vllm::Fp8KVCacheDataType)0>(__nv_bfloat16 const*, __nv_bfloat16 const*, __nv_bfloat16*, __nv_bfloat16*, long const*, long, long, long, long, int, int, int, float const*, float const*)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 1132.0,
+   "dur": 6.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 2
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "void cutlass::device_kernel<flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<112>, cute::C<128> > > > > >(flash::FlashAttnFwdSm90::Params)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 1140.0,
+   "dur": 60.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 3
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "sm90_xmma_gemm_bf16bf16_bf16f32_f32_tn_n_tilesize64x128x64_warpgroupsize1x1x1_execute_segment_k_off_kernel__5x_cublas",
+   "pid": 0,
+   "tid": 7,
+   "ts": 1202.0,
+   "dur": 50.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 4
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "std::enable_if<(((8)>(0)))&&vllm::_typeConvert<c10::BFloat16>::exists, void>::type vllm::fused_add_rms_norm_kernel<c10::BFloat16, 8>(c10::BFloat16*, c10::BFloat16*, c10::BFloat16 const*, float, int, int)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 1254.0,
+   "dur": 10.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 5
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "sm90_xmma_gemm_bf16bf16_bf16f32_f32_tn_n_tilesize256x128x64_warpgroupsize2x1x1_execute_segment_k_off_kernel__5x_cublas",
+   "pid": 0,
+   "tid": 7,
+   "ts": 1266.0,
+   "dur": 300.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 6
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "void vllm::act_and_mul_kernel<c10::BFloat16, &(c10::BFloat16 vllm::silu_kernel<c10::BFloat16>(c10::BFloat16 const&)), true>(c10::BFloat16*, c10::BFloat16 const*, int)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 1568.0,
+   "dur": 25.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 7
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "sm90_xmma_gemm_bf16bf16_bf16f32_f32_tn_n_tilesize128x128x64_warpgroupsize1x1x1_execute_segment_k_off_kernel__5x_cublas",
+   "pid": 0,
+   "tid": 7,
+   "ts": 1595.0,
+   "dur": 150.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 8
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "nvjet_tst_128x256_64x4_2x1_v_bz_coopA_TNT",
+   "pid": 0,
+   "tid": 7,
+   "ts": 1747.0,
+   "dur": 200.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 9
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "void at::native::(anonymous namespace)::cunn_SoftMaxForward<4, float, float, float, at::native::(anonymous namespace)::SoftMaxForwardEpilogue>(float*, float const*, int)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 1949.0,
+   "dur": 30.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 10
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "void at::native::sbtopk::gatherTopK<float, unsigned int, 2, false>(at::cuda::detail::TensorInfo<float, unsigned int>, unsigned int, unsigned int, bool, unsigned int, unsigned int, at::cuda::detail::TensorInfo<float, unsigned int>, unsigned int, at::cuda::detail::TensorInfo<long, unsigned int>, unsigned int, unsigned int*)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 1981.0,
+   "dur": 20.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 11
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "void at::native::(anonymous namespace)::distribution_elementwise_grid_stride_kernel<float, 4, at::native::templates::cuda::exponential_kernel<at::CUDAGeneratorImpl*>(at::TensorIteratorBase&, double, at::CUDAGeneratorImpl*)::{lambda()#1}::operator()() const::{lambda()#2}::operator()() const::{lambda(curandStatePhilox4_32_10*)#1}>(long, at::PhiloxCudaState, at::native::templates::cuda::exponential_kernel<at::CUDAGeneratorImpl*>(at::TensorIteratorBase&, double, at::CUDAGeneratorImpl*)::{lambda()#1}::operator()() const::{lambda()#2}::operator()() const::{lambda(curandStatePhilox4_32_10*)#1}, void at::native::(anonymous namespace)::distribution_nullary_kernel<float, float, float4, at::native::templates::cuda::exponential_kernel<at::CUDAGeneratorImpl*>(at::TensorIteratorBase&, double, at::CUDAGeneratorImpl*)::{lambda()#1}::operator()() const::{lambda()#2}::operator()() const::{lambda(curandStatePhilox4_32_10*)#1}>(at::TensorIteratorBase&, at::CUDAGeneratorImpl*, at::native::templates::cuda::exponential_kernel<at::CUDAGeneratorImpl*>(at::TensorIteratorBase&, double, at::CUDAGeneratorImpl*)::{lambda()#1}::operator()() const::{lambda()#2}::operator()() const::{lambda(curandStatePhilox4_32_10*)#1})::{lambda(int, float)#1})",
+   "pid": 0,
+   "tid": 7,
+   "ts": 2003.0,
+   "dur": 10.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 12
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "gpu_memcpy",
+   "name": "Memcpy DtoH (Device -> Pinned)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 2015.0,
+   "dur": 5.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 13
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "cuda_runtime",
+   "name": "cudaGraphLaunch",
+   "pid": 1234,
+   "tid": 1234,
+   "ts": 3500.0,
+   "dur": 4.0
+  },
+  {
+   "ph": "X",
+   "cat": "cuda_runtime",
+   "name": "cudaLaunchKernel",
+   "pid": 1234,
+   "tid": 1234,
+   "ts": 3508.0,
+   "dur": 3.0
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "sm90_xmma_gemm_bf16bf16_bf16f32_f32_tn_n_tilesize128x128x64_warpgroupsize1x1x1_execute_segment_k_off_kernel__5x_cublas",
+   "pid": 0,
+   "tid": 7,
+   "ts": 3520.0,
+   "dur": 120.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 100
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "void vllm::rotary_embedding_kernel<c10::BFloat16, true>(long const*, c10::BFloat16*, c10::BFloat16*, c10::BFloat16 const*, int, long, long, int, int, int)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 3642.0,
+   "dur": 8.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 101
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "void vllm::reshape_and_cache_flash_kernel<__nv_bfloat16, __nv_bfloat16, (vllm::Fp8KVCacheDataType)0>(__nv_bfloat16 const*, __nv_bfloat16 const*, __nv_bfloat16*, __nv_bfloat16*, long const*, long, long, long, long, int, int, int, float const*, float const*)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 3652.0,
+   "dur": 6.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 102
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "void cutlass::device_kernel<flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<112>, cute::C<128> > > > > >(flash::FlashAttnFwdSm90::Params)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 3660.0,
+   "dur": 60.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 103
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "sm90_xmma_gemm_bf16bf16_bf16f32_f32_tn_n_tilesize64x128x64_warpgroupsize1x1x1_execute_segment_k_off_kernel__5x_cublas",
+   "pid": 0,
+   "tid": 7,
+   "ts": 3722.0,
+   "dur": 50.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 104
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "std::enable_if<(((8)>(0)))&&vllm::_typeConvert<c10::BFloat16>::exists, void>::type vllm::fused_add_rms_norm_kernel<c10::BFloat16, 8>(c10::BFloat16*, c10::BFloat16*, c10::BFloat16 const*, float, int, int)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 3774.0,
+   "dur": 10.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 105
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "sm90_xmma_gemm_bf16bf16_bf16f32_f32_tn_n_tilesize256x128x64_warpgroupsize2x1x1_execute_segment_k_off_kernel__5x_cublas",
+   "pid": 0,
+   "tid": 7,
+   "ts": 3786.0,
+   "dur": 300.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 106
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "void vllm::act_and_mul_kernel<c10::BFloat16, &(c10::BFloat16 vllm::silu_kernel<c10::BFloat16>(c10::BFloat16 const&)), true>(c10::BFloat16*, c10::BFloat16 const*, int)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 4088.0,
+   "dur": 25.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 107
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "sm90_xmma_gemm_bf16bf16_bf16f32_f32_tn_n_tilesize128x128x64_warpgroupsize1x1x1_execute_segment_k_off_kernel__5x_cublas",
+   "pid": 0,
+   "tid": 7,
+   "ts": 4115.0,
+   "dur": 150.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 108
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "nvjet_tst_128x256_64x4_2x1_v_bz_coopA_TNT",
+   "pid": 0,
+   "tid": 7,
+   "ts": 4267.0,
+   "dur": 200.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 109
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "void at::native::(anonymous namespace)::cunn_SoftMaxForward<4, float, float, float, at::native::(anonymous namespace)::SoftMaxForwardEpilogue>(float*, float const*, int)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 4469.0,
+   "dur": 30.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 110
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "void at::native::sbtopk::gatherTopK<float, unsigned int, 2, false>(at::cuda::detail::TensorInfo<float, unsigned int>, unsigned int, unsigned int, bool, unsigned int, unsigned int, at::cuda::detail::TensorInfo<float, unsigned int>, unsigned int, at::cuda::detail::TensorInfo<long, unsigned int>, unsigned int, unsigned int*)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 4501.0,
+   "dur": 20.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 111
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "kernel",
+   "name": "void at::native::(anonymous namespace)::distribution_elementwise_grid_stride_kernel<float, 4, at::native::templates::cuda::exponential_kernel<at::CUDAGeneratorImpl*>(at::TensorIteratorBase&, double, at::CUDAGeneratorImpl*)::{lambda()#1}::operator()() const::{lambda()#2}::operator()() const::{lambda(curandStatePhilox4_32_10*)#1}>(long, at::PhiloxCudaState, at::native::templates::cuda::exponential_kernel<at::CUDAGeneratorImpl*>(at::TensorIteratorBase&, double, at::CUDAGeneratorImpl*)::{lambda()#1}::operator()() const::{lambda()#2}::operator()() const::{lambda(curandStatePhilox4_32_10*)#1}, void at::native::(anonymous namespace)::distribution_nullary_kernel<float, float, float4, at::native::templates::cuda::exponential_kernel<at::CUDAGeneratorImpl*>(at::TensorIteratorBase&, double, at::CUDAGeneratorImpl*)::{lambda()#1}::operator()() const::{lambda()#2}::operator()() const::{lambda(curandStatePhilox4_32_10*)#1}>(at::TensorIteratorBase&, at::CUDAGeneratorImpl*, at::native::templates::cuda::exponential_kernel<at::CUDAGeneratorImpl*>(at::TensorIteratorBase&, double, at::CUDAGeneratorImpl*)::{lambda()#1}::operator()() const::{lambda()#2}::operator()() const::{lambda(curandStatePhilox4_32_10*)#1})::{lambda(int, float)#1})",
+   "pid": 0,
+   "tid": 7,
+   "ts": 4523.0,
+   "dur": 10.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 112
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "gpu_memcpy",
+   "name": "Memcpy DtoH (Device -> Pinned)",
+   "pid": 0,
+   "tid": 7,
+   "ts": 4535.0,
+   "dur": 5.0,
+   "args": {
+    "device": 0,
+    "stream": 7,
+    "correlation": 113
+   }
+  },
+  {
+   "ph": "X",
+   "cat": "cuda_runtime",
+   "name": "cudaLaunchKernel",
+   "pid": 1234,
+   "tid": 1234,
+   "ts": 50.0,
+   "dur": 3.0
+  },
+  {
+   "ph": "f",
+   "cat": "ac2g",
+   "name": "ac2g",
+   "id": 1,
+   "pid": 0,
+   "tid": 7,
+   "ts": 1000.0
+  }
+ ]
+}

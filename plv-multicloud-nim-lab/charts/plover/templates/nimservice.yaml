@@ -1,0 +1,90 @@
+{{- if and .Values.llm.enabled (eq .Values.llm.mode "operator") }}
+{{- include "plover.verifyGuard" . }}
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: {{ include "plover.llmName" . }}
+  labels: {{- include "plover.labels" . | nindent 4 }}
+spec:
+  userID: {{ .Values.llm.userID }}
+  groupID: {{ .Values.llm.groupID }}
+  image:
+    repository: {{ .Values.llm.image.repository }}
+    tag: {{ .Values.llm.image.tag | quote }}
+    pullPolicy: {{ .Values.llm.image.pullPolicy }}
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    {{- if eq .Values.llm.cache.mode "nimcache" }}
+    nimCache:
+      name: {{ include "plover.cacheName" . }}
+      profile: {{ .Values.llm.profile | quote }}
+    {{- else if eq .Values.llm.cache.mode "emptydir" }}
+    emptyDir:
+      sizeLimit: {{ .Values.llm.cache.emptyDirSizeLimit }}
+    {{- else }}
+    hostPath: {{ .Values.llm.cache.hostPath }}
+    {{- end }}
+  env: {{- include "plover.llmEnv" . | nindent 4 }}
+  {{- if and .Values.llm.lora.enabled .Values.llm.lora.adapters }}
+  # LoRA adapters are OCI artifacts. The operator mounts a per-pod /scratch volume into init containers AND the NIM
+  # container, so each init container pulls one adapter there; NIM serves it under the folder name.
+  initContainers:
+    {{- range $i, $a := .Values.llm.lora.adapters }}
+    - name: lora-{{ $i }}
+      image:
+        repository: {{ $.Values.llm.lora.puller.repository }}
+        tag: {{ $.Values.llm.lora.puller.tag | quote }}
+      command: ["oras"]
+      args: ["pull", {{ $a.ref | quote }}, "-o", {{ printf "/scratch/loras/%s" $a.name | quote }}]
+    {{- end }}
+  {{- end }}
+  resources:
+    limits:
+      {{ .Values.llm.gpuResource }}: {{ .Values.llm.gpuCount }}
+  nodeSelector: {{- toYaml .Values.llm.nodeSelector | nindent 4 }}
+  tolerations: {{- toYaml .Values.llm.tolerations | nindent 4 }}
+  {{- with .Values.llm.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if .Values.llm.autoscaling.enabled }}
+  scale:
+    enabled: true
+    hpa:
+      minReplicas: {{ .Values.llm.autoscaling.minReplicas }}
+      maxReplicas: {{ .Values.llm.autoscaling.maxReplicas }}
+      metrics:
+        - type: Pods
+          pods:
+            metric:
+              name: vllm_num_requests_waiting
+            target:
+              type: AverageValue
+              averageValue: {{ .Values.llm.autoscaling.queueDepthTarget | quote }}
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 0
+        scaleDown:
+          stabilizationWindowSeconds: 300
+  {{- else }}
+  replicas: {{ .Values.llm.replicas }}
+  {{- end }}
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+  metrics:
+    enabled: {{ .Values.serviceMonitor.enabled }}
+    serviceMonitor:
+      interval: 15s
+  startupProbe:
+    enabled: true
+    probe:
+      httpGet:
+        path: /v1/health/ready
+        port: 8000
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      failureThreshold: {{ .Values.llm.startupFailureThreshold }}
+{{- end }}

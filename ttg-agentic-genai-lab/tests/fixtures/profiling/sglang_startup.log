@@ -1,0 +1,8 @@
+[2026-10-17 21:10:00] server_args=ServerArgs(model_path='meta-llama/Llama-3.1-8B-Instruct', served_model_name='ttg-llm', context_length=16384, mem_fraction_static=0.85, enable_metrics=True)
+[2026-10-17 21:10:06 TP0] Init torch distributed begin.
+[2026-10-17 21:10:07 TP0] Load weight begin. avail mem=78.68 GB
+[2026-10-17 21:10:12 TP0] Load weight end. elapsed=4.86 s, type=LlamaForCausalLM, avail mem=63.62 GB, mem usage=15.06 GB.
+[2026-10-17 21:10:13 TP0] KV Cache is allocated. dtype: torch.bfloat16, #tokens: 413000, K size: 25.21 GB, V size: 25.21 GB
+[2026-10-17 21:10:40 TP0] Capture decode CUDA graph end. elapsed=26.40 s, mem usage=0.61 GB, avail mem=10.11 GB.
+[2026-10-17 21:10:44] INFO:     Application startup complete.
+[2026-10-17 21:10:52] The server is fired up and ready to roll!

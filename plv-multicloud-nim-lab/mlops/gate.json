@@ -1,0 +1,8 @@
+{
+  "_comment": "LoRA release gate (🔁 Lab 02 perf gate, Lab 03 safety gate - same shape, now for a model artifact).",
+  "min_schema_valid": 0.97,
+  "max_hallucinated_code_rate": 0.0,
+  "min_recommendation_agreement": 0.90,
+  "max_prompt_token_ratio": 0.35,
+  "max_latency_p95_ratio": 1.10
+}

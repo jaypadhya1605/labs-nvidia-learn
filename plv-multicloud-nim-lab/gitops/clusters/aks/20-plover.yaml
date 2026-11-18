@@ -1,0 +1,29 @@
+# The product. Same chart on every cloud; the cluster's values file is the ONLY difference.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: plover
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/YOUR_GITHUB_USER/plv-multicloud-nim-lab.git
+    targetRevision: main
+    path: charts/plover
+    helm:
+      releaseName: plover
+      valueFiles:
+        - ../../clusters/aks/values.yaml
+        - ../../clusters/aks/generated/plover-generated-values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: plv-serving
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

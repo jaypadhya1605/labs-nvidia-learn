@@ -1,0 +1,15 @@
+# garak 0.17 target config: the RAW agent LLM (no rails). Probes and target type come from the CLI (redteam/garak-job.yaml).
+system:
+  parallel_attempts: 8
+  lite: true
+run:
+  generations: 1
+  soft_probe_prompt_cap: 40
+plugins:
+  generators:
+    openai:
+      OpenAICompatible:
+        uri: http://triage-llm.lfy-agent.svc:8000/v1/
+        api_key: not-used
+        model: meta/llama-3.1-8b-instruct
+        max_tokens: 200

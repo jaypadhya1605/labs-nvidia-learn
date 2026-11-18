@@ -1,0 +1,208 @@
+# Lab 05 pipeline - JR2019035 names GitLab, so this is the primary CI (.github/workflows/ci.yml mirrors it).
+#   lint -> test -> eval-gate (CPU mock, every push) -> perf-gate (GPU runner: manual or scheduled) -> build -> deploy
+# 🔁 Lab 04's perf gate, now behind an EVAL gate: a faster engine that breaks the Tern Care policy never ships.
+# Images below must match env/pins.env (tests/test_pins.py fails the pipeline on drift).
+
+stages: [lint, test, eval-gate, perf-gate, build, deploy]
+
+variables:
+  PYTHON_IMAGE: "python:3.12-slim"
+  HELM_IMAGE: "alpine/helm:3.22.1"
+  KANIKO_IMAGE: "gcr.io/kaniko-project/executor:v1.23.2-debug"
+  SHELLCHECK_IMAGE: "koalaman/shellcheck-alpine:v0.11.0"
+  HELM_VERSION: "v3.22.1"
+  KUBECONFORM_VERSION: "v0.8.0"
+  RUFF_VERSION: "0.16.8"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  IMAGE: "$CI_REGISTRY_IMAGE/ttg-agent"
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never                       # no duplicate branch + MR pipelines
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+default:
+  interruptible: true
+
+.python:
+  image: $PYTHON_IMAGE
+  cache:
+    key: pip-$CI_COMMIT_REF_SLUG
+    paths: [.cache/pip]
+  before_script:
+    - python -m pip install -q -r requirements-dev.txt
+    - mkdir -p results
+
+.k8s-tools: &k8s-tools
+  - python -c "import urllib.request,tarfile,io; t=tarfile.open(fileobj=io.BytesIO(urllib.request.urlopen('https://get.helm.sh/helm-$HELM_VERSION-linux-amd64.tar.gz').read())); open('/usr/local/bin/helm','wb').write(t.extractfile('linux-amd64/helm').read())"
+  - python -c "import urllib.request,tarfile,io; t=tarfile.open(fileobj=io.BytesIO(urllib.request.urlopen('https://github.com/yannh/kubeconform/releases/download/$KUBECONFORM_VERSION/kubeconform-linux-amd64.tar.gz').read())); open('/usr/local/bin/kubeconform','wb').write(t.extractfile('kubeconform').read())"
+  - chmod +x /usr/local/bin/helm /usr/local/bin/kubeconform
+
+# ---------------------------------------------------------------------------------------------------------- lint
+shellcheck:
+  stage: lint
+  image: $SHELLCHECK_IMAGE
+  script:
+    - find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 -r shellcheck -x
+
+ruff:
+  stage: lint
+  image: $PYTHON_IMAGE
+  script:
+    - python -m pip install -q "ruff==$RUFF_VERSION"
+    - ruff check --select E9,F63,F7,F82 .    # syntax errors and undefined names: the bugs that reach a GPU bill
+
+helm-lint:
+  stage: lint
+  image:
+    name: $HELM_IMAGE
+    entrypoint: [""]
+  script:
+    - for v in kind aks gke; do helm lint deploy/helm/ttg -f deploy/values/$v.yaml; done
+
+# ---------------------------------------------------------------------------------------------------------- test
+pytest:
+  stage: test
+  extends: .python
+  before_script:
+    - *k8s-tools
+    - python -m pip install -q -r requirements-dev.txt
+    - mkdir -p results
+  script:
+    - python -m pytest -q --junitxml=results/junit.xml
+  artifacts:
+    when: always
+    reports:
+      junit: results/junit.xml
+    paths: [results/]
+
+manifests:
+  stage: test
+  image: $PYTHON_IMAGE
+  before_script: *k8s-tools
+  script:
+    - scripts/validate-manifests.sh
+
+# ----------------------------------------------------------------------------------------------------- eval-gate
+# Every push: the agent runs the golden set against the CPU mock with real MCP servers over streamable HTTP
+# (the Kubernetes code path) and must stay policy-compliant.
+eval-gate:
+  stage: eval-gate
+  extends: .python
+  variables:
+    TTG_BASE_URL: "http://localhost:8000/v1"
+    TTG_MODEL: "ttg-llm"
+    TTG_MCP_MODE: "http"
+    TTG_MCP_OPS_URL: "http://localhost:8101/mcp"
+    TTG_MCP_GUEST_URL: "http://localhost:8102/mcp"
+  script:
+    - uvicorn ttg.mock.fake_llm:app --host 127.0.0.1 --port 8000 > results/mock.log 2>&1 &
+    - python -m ttg.mcp.ops_server --transport streamable-http --port 8101 > results/mcp-ops.log 2>&1 &
+    - python -m ttg.mcp.guest_server --transport streamable-http --port 8102 > results/mcp-guest.log 2>&1 &
+    - python scripts/wait_for.py http://localhost:8000/v1/models http://localhost:8101/mcp http://localhost:8102/mcp --timeout 90
+    - python -m ttg.bench.agent_bench --label ci-mock --engine mock --levels 4 --n 40
+    - python scripts/gate.py eval results/bench/ci-mock.json --min-success 0.95 --junit results/eval-gate.xml
+  artifacts:
+    when: always
+    reports:
+      junit: results/eval-gate.xml
+    paths: [results/]
+
+# ----------------------------------------------------------------------------------------------------- perf-gate
+# GPU runner (shell executor on the M4 GPU VM, registered with tag "gpu"): launch the engine, benchmark the agent,
+# compare with the committed baseline. Re-record baselines deliberately: bench/baselines/README.md.
+perf-gate:
+  stage: perf-gate
+  tags: [gpu]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true               # a manual gate must not block the pipeline until someone presses play
+  variables:
+    ENGINE: "vllm"
+    VARIANT: "base"
+    TTG_MODEL: "ttg-llm"                # every engine in engines/launch.sh serves the base model under this name
+                                        # (lora: ttg-short on vLLM, ttg-llm:ttg-short on SGLang, + TTG_PROMPT_VARIANT=short)
+    BASELINE: "bench/baselines/vllm-base-h100.json"
+    GPU_HOURLY_USD: "2.49"              # set the real price as a CI/CD variable on the runner's project
+    GPUS: "0"                           # DEVICE LIST for engines/launch.sh ("0,1" for tp2 / pp2 / dp2), not a count
+    GPUS_PER_REPLICA: "1"               # GPU COUNT behind the engine ($ per 1,000 disruptions); 2 for tp2 / pp2 / dp2
+  script:
+    # a venv per job: uv (installed system-wide by scripts/gpu-vm-bootstrap.sh) fetches Python 3.12 on any Ubuntu
+    - uv venv -q --python 3.12 .venv && uv pip install -q --python .venv -r requirements-dev.txt
+    - . .venv/bin/activate
+    - mkdir -p results
+    # the gate refuses to compare across GPUs, so the bench must record which GPU produced the numbers
+    - export GPU_NAME="${GPU_NAME:-$(nvidia-smi --query-gpu=name --format=csv,noheader | head -n1)}"
+    - engines/launch.sh "$ENGINE" "$VARIANT"
+    - |
+      case "$ENGINE" in   # same probes as the BENCH line of DRY_RUN=1 engines/launch.sh
+        vllm)   EXTRA="--metrics-url http://localhost:8000/metrics --reset-url http://localhost:8000/reset_prefix_cache" ;;
+        sglang) EXTRA="--metrics-url http://localhost:8000/metrics --reset-url http://localhost:8000/flush_cache" ;;
+        nim)    EXTRA="--metrics-url http://localhost:8000/v1/metrics" ;;
+        *)      EXTRA="--metrics-url http://localhost:8000/metrics" ;;
+      esac
+      python -m ttg.bench.agent_bench --label "$ENGINE-$VARIANT" --engine "$ENGINE" --levels 1,4,16 --n 48 \
+        --gpu-name "$GPU_NAME" --gpu-hourly "$GPU_HOURLY_USD" --gpus "$GPUS_PER_REPLICA" $EXTRA
+    - python scripts/gate.py perf "results/bench/$ENGINE-$VARIANT.json" --baseline "$BASELINE" --max-p95-regression 0.10 --max-cost-regression 0.10 --junit results/perf-gate.xml
+  after_script:
+    - engines/stop.sh || true           # never leave a GPU engine running after the job
+  artifacts:
+    when: always
+    reports:
+      junit: results/perf-gate.xml
+    paths: [results/]
+
+# --------------------------------------------------------------------------------------------------------- build
+build-image:
+  stage: build
+  image:
+    name: $KANIKO_IMAGE
+    entrypoint: [""]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf '%s:%s' "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - DESTS="--destination ${IMAGE}:${CI_COMMIT_SHORT_SHA}"
+    - if [ -n "${CI_COMMIT_TAG}" ]; then DESTS="${DESTS} --destination ${IMAGE}:${CI_COMMIT_TAG}"; fi
+    - /kaniko/executor --context "${CI_PROJECT_DIR}" --dockerfile "${CI_PROJECT_DIR}/deploy/Dockerfile" ${DESTS}
+
+# -------------------------------------------------------------------------------------------------------- deploy
+# GitLab agent for Kubernetes: KUBE_CONTEXT = "<group>/<project>:<agent name>" (🔁 Lab 04 AKS / GKE clusters).
+.deploy:
+  stage: deploy
+  image:
+    name: $HELM_IMAGE
+    entrypoint: [""]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+    - if: $CI_COMMIT_TAG
+      when: manual
+  script:
+    - helm upgrade --install ttg deploy/helm/ttg --kube-context "$KUBE_CONTEXT" -n "$TTG_NAMESPACE" --create-namespace -f "deploy/values/$CLUSTER.yaml" --set image.repository="$IMAGE" --set image.tag="$CI_COMMIT_SHORT_SHA" --wait --timeout 45m
+    - helm test ttg --kube-context "$KUBE_CONTEXT" -n "$TTG_NAMESPACE" --timeout 10m
+
+deploy-staging:
+  extends: .deploy
+  environment:
+    name: staging
+  variables:
+    CLUSTER: "aks"
+    TTG_NAMESPACE: "ttg-staging"
+
+deploy-prod:
+  extends: .deploy
+  needs: [deploy-staging]
+  environment:
+    name: production
+  variables:
+    CLUSTER: "gke"
+    TTG_NAMESPACE: "ttg"

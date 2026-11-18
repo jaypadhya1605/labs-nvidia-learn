@@ -1,0 +1,26 @@
+# Joint action log with the customer (Plover Health AI) - reviewed in every weekly sync (fleet/weekly_sync.py).
+# Synthetic example entries; keep it short, owned and dated.
+- id: A-101
+  title: Confirm Azure quota for 2nd A100 node (M7 scale-out test)
+  owner: Plover platform (Dana)
+  due: 2026-10-22
+  status: open
+  kind: blocker
+- id: A-102
+  title: Decide GKE storage for the NIM cache - emptyDir today vs Filestore (cold start vs cost)
+  owner: NVIDIA SA (Jay)
+  due: 2026-10-24
+  status: open
+  kind: decision
+- id: A-103
+  title: Share signed-off PoC success criteria with the CFO's office
+  owner: Plover VP Eng
+  due: 2026-10-20
+  status: done
+  kind: business
+- id: A-104
+  title: Evaluate Nemotron 3.5 Lightning for the agent workflow (add-on results)
+  owner: NVIDIA SA (Jay)
+  due: 2026-10-29
+  status: open
+  kind: new-feature

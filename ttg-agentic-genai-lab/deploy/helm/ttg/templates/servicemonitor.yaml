@@ -1,0 +1,37 @@
+{{- if .Values.serviceMonitor.enabled }}
+{{- $e := .Values.engine }}
+# kube-prometheus-stack (🔁 Lab 04) scrapes the engine (prefix-cache hits/queries, queue depth, TTFT histograms) and the
+# agent (ttg_tasks_total, ttg_task_success_total, ttg_task_latency_seconds: the business SLO, per handled disruption).
+# trtllm-serve's /metrics is JSON iteration stats, so it is read by `python -m ttg.bench.scrape_metrics` instead.
+{{- if and $e.enabled (ne $e.kind "trtllm") }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $e.name }}
+  labels: {{- include "ttg.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ $e.name }}
+  endpoints:
+    - port: http
+      path: {{ include "ttg.engineMetricsPath" . }}
+      interval: {{ .Values.serviceMonitor.interval }}
+{{- end }}
+{{- if .Values.agent.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Values.agent.name }}
+  labels: {{- include "ttg.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.agent.name }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.serviceMonitor.interval }}
+{{- end }}
+{{- end }}

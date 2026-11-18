@@ -1,0 +1,41 @@
+# NeMo Guardrails 0.24 configuration for every LLM call the SOC agent makes.
+# passthrough: the agent's own system prompt and messages reach the LLM unchanged; rails wrap the call.
+models:
+  - type: main
+    engine: nim
+    model: meta/llama-3.1-8b-instruct
+    parameters:
+      base_url: http://triage-llm.lfy-agent.svc:8000/v1
+      temperature: 0.0
+      max_tokens: 512
+  - type: content_safety
+    engine: nim
+    model: nvidia/llama-3.1-nemotron-safety-guard-8b-v3
+    parameters:
+      base_url: http://safety-guard.lfy-safety.svc:8000/v1
+passthrough: true
+rails:
+  config:
+    jailbreak_detection:
+      nim_base_url: http://jailbreak-detect.lfy-safety.svc:8000/v1/
+      nim_server_endpoint: /v1/security/nvidia/nemoguard-jailbreak-detect
+    sensitive_data_detection:
+      output:
+        entities: [PERSON, US_SSN, MEDICAL_RECORD_NUMBER]
+      recognizers:
+        - name: kha_mrn
+          supported_language: en
+          supported_entity: MEDICAL_RECORD_NUMBER
+          patterns:
+            - name: mrn
+              regex: "MRN-?\\d{7}"
+              score: 0.9
+  input:
+    parallel: true
+    flows:
+      - jailbreak detection model
+      - content safety check input $model=content_safety
+  output:
+    flows:
+      - content safety check output $model=content_safety
+      - mask sensitive data on output

@@ -1,0 +1,36 @@
+# The UM tenant arrives: its queue has a guaranteed quota of 1 GPU, so KAI reclaims one GPU from the batch.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: um-interactive
+  namespace: kha-kai-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: um-interactive
+  template:
+    metadata:
+      labels:
+        app: um-interactive
+        kai.scheduler/queue: kha-um
+    spec:
+      schedulerName: kai-scheduler
+      priorityClassName: inference
+      nodeSelector:
+        kha.io/pool: dynamo
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: kubernetes.azure.com/scalesetpriority
+          operator: Equal
+          value: spot
+          effect: NoSchedule
+      containers:
+        - name: um
+          image: ${CUDA_BASE_IMAGE}
+          command: ["bash", "-c", "nvidia-smi -L; echo 'UM interactive serving'; sleep infinity"]
+          resources:
+            limits:
+              nvidia.com/gpu: 1

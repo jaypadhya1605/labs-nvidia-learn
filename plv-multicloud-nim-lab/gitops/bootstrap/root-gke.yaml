@@ -1,0 +1,19 @@
+# Root "app of apps" for gke: Argo CD in this cluster pulls everything under gitops/clusters/gke.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: plv-root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/YOUR_GITHUB_USER/plv-multicloud-nim-lab.git
+    targetRevision: main
+    path: gitops/clusters/gke
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

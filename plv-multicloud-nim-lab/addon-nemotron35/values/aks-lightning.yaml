@@ -1,0 +1,28 @@
+# Add-on overlay: Nemotron 3.5 Lightning (30B-A3B hybrid Mamba-MoE) on the AKS A100 80GB.
+# Layered on clusters/aks/values.yaml by addon-nemotron35/deploy.sh (release plover-addon, namespace plv-addon).
+llm:
+  image:
+    repository: nvcr.io/nim/nvidia/nemotron-3.5-lightning-30b-a3b
+    tag: "2.0.9-variant"                 # NIM docs (2.0.10 guide); newer tags may exist - scripts/check-images.sh
+  servedModelName: nvidia/nemotron-3.5-lightning-30b-a3b
+  extraEnv:
+    - {name: NIM_MODEL_NAME, value: nvidia/nemotron-3.5-lightning-30b-a3b}   # NIM docs: keep identical to the served name
+  precision: bf16                        # A1 says BF16 fits (65.8 GB) but leaves ~4 GB for state; then try W4A16 (A2 step 4)
+  profile: ""                            # empty = let NIM choose; A2 step 3 pins the profile you measured
+  maxModelLen: 32768                     # native window is 256K - size the PoC for the agent steps you actually run
+  extraArgs: "--reasoning-parser nemotron_v3 --enable-auto-tool-choice --tool-call-parser qwen3_coder"
+  cache:
+    mode: emptydir                       # day-0: no shared cache yet; ~63 GB BF16 / ~19 GB 4-bit per pod start
+    emptyDirSizeLimit: 150Gi
+  lora:
+    enabled: false                       # Plover's adapters were trained for Llama 3.1 8B
+  startupFailureThreshold: 360           # first start downloads the model
+api:
+  routing: {stableModel: "", canaryModel: "", canaryWeight: 0}
+  llmExtraBody:
+    chat_template_kwargs: {enable_thinking: false}   # summaries do not need reasoning tokens; the agent eval tries both
+bench:
+  toolbox:
+    enabled: false
+networkPolicy:
+  allowNamespaces: [plv-mlops, plv-serving]   # A4: the AIPerf toolbox in plv-serving benchmarks this NIM

@@ -1,0 +1,87 @@
+# Defaults are cloud-neutral. Everything cloud-specific lives in clusters/<cluster>/values.yaml.
+cloud: generic                       # aks | gke | eks | oke | rke2 (labels + NOTES only)
+
+secrets:
+  mode: external                     # external = External Secrets Operator from the cloud's secret manager | existing
+  storeRef:
+    kind: ClusterSecretStore
+    name: plv-cloud-secrets
+  ngcKey: plv-ngc-api-key
+  hfToken: plv-hf-token
+  refreshInterval: 1h
+
+llm:
+  enabled: true
+  mode: operator                     # operator = NIM Operator (NIMService/NIMCache) | deployment = plain Deployment (air gap)
+  name: plover-llm
+  image:
+    repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
+    tag: "2.0.13"
+    pullPolicy: IfNotPresent
+  servedModelName: ""                # empty = NIM default (meta/llama-3.1-8b-instruct)
+  precision: bf16                    # bf16 | fp8 | nvfp4 (NIMCache filter; fp8 needs Ada/Hopper+, nvfp4 needs Blackwell)
+  profile: "vllm-bf16-tp1-pp1-feat_lora"   # VERIFY per GPU with list-model-profiles (M4) - LoRA profiles carry a -lora/-feat_lora suffix
+  replicas: 1
+  gpuResource: nvidia.com/gpu
+  gpuCount: 1
+  maxModelLen: 8192
+  extraArgs: ""                      # extra vLLM flags via NIM_PASSTHROUGH_ARGS (add-on: reasoning + tool-call parsers)
+  extraEnv: []                       # extra NIM env, e.g. [{name: NIM_MODEL_NAME, value: nvidia/...}] (add-on: Nemotron 3.5)
+  userID: 1000
+  groupID: 0
+  cache:
+    mode: nimcache                   # nimcache (shared RWX PVC) | emptydir (download per pod) | hostpath (node-local)
+    storageClass: ""
+    size: 100Gi
+    accessMode: ReadWriteMany
+    emptyDirSizeLimit: 120Gi
+    hostPath: /opt/nim-cache
+  lora:
+    enabled: true
+    refreshSeconds: 0                # 0 = static (pods restart when the adapter list changes - GitOps-friendly)
+    puller:
+      repository: ghcr.io/oras-project/oras
+      tag: v1.3.4
+    adapters: []                     # - name: plover-style-v1
+                                     #   ref: ghcr.io/<owner>/plover-adapters:style-v1
+  nodeSelector:
+    plv.io/pool: gpu
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  annotations: {}
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 2
+    queueDepthTarget: "4"            # vllm_num_requests_waiting per pod (🔁 Lab 02 M9)
+  startupFailureThreshold: 180
+
+api:
+  enabled: true
+  name: plover-api
+  image:
+    repository: ghcr.io/OWNER/plover-api
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  routing:
+    stableModel: ""                  # empty = base model with the long style prompt
+    canaryModel: ""                  # e.g. plover-style-v2 (a LoRA adapter name)
+    canaryWeight: 0                  # 0-100 % of summarize traffic
+  llmExtraBody: {}                   # merged into every summarize call, e.g. {chat_template_kwargs: {enable_thinking: false}}
+  resources:
+    requests: {cpu: 250m, memory: 256Mi}
+    limits: {cpu: "1", memory: 512Mi}
+
+bench:
+  toolbox:
+    enabled: false                   # M5: AIPerf toolbox in this namespace (🔁 Lab 02)
+    aiperfVersion: "0.13.0"
+
+serviceMonitor:
+  enabled: true
+networkPolicy:
+  enabled: true
+  allowNamespaces: []                # e.g. [plv-mlops]: M8 jobs call the teacher model and the eval gate

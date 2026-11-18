@@ -1,0 +1,36 @@
+# kube-prometheus-stack for real-time control loops (HPA via prometheus-adapter) and lab dashboards.
+# Long-term retention + executive dashboards go to Azure Monitor workspace + Azure Managed Grafana (M6).
+fullnameOverride: kps
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    scrapeInterval: 15s
+    # Pick up ServiceMonitors / PodMonitors / rules from every namespace without a release label.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: managed-csi-premium
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+alertmanager:
+  enabled: false
+grafana:
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+prometheus-node-exporter:
+  tolerations:
+    - operator: Exists

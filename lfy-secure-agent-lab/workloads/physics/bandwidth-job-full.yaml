@@ -1,0 +1,32 @@
+# M8 part D: the same probe on the whole GPU (after platform/set-gpu-mode.sh full).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bw-probe-full
+  namespace: lfy-bench
+  labels: {app: bw-probe-full}
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels: {app: bw-probe-full}
+    spec:
+      restartPolicy: Never
+      nodeSelector: {kha.io/pool: mig}
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: kubernetes.azure.com/scalesetpriority, operator: Equal, value: spot, effect: NoSchedule}
+      containers:
+        - name: probe
+          image: ${CUDA_DEVEL_IMAGE}
+          command: ["bash", "-c"]
+          args:
+            - |
+              set -e
+              nvidia-smi -L || true
+              nvcc -O3 -std=c++17 -gencode arch=compute_${CUDA_ARCH},code=sm_${CUDA_ARCH} -o /tmp/bw /code/bandwidth_probe.cu
+              /tmp/bw 30
+          resources:
+            limits: {nvidia.com/gpu: 1}
+          volumeMounts: [{name: code, mountPath: /code}]
+      volumes: [{name: code, configMap: {name: bw-probe}}]

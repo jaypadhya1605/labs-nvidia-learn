@@ -1,0 +1,10 @@
+# Laptop / CI tooling for Lab 05 (the container image installs deploy/requirements-runtime.txt only).
+# GPU-side packages (vllm, sglang, tensorrt-llm, torch, trl, peft) live in the engine / training containers, not here.
+-r deploy/requirements-runtime.txt
+pytest==9.1.1
+pyyaml==6.0.3             # tests parse rendered Helm output and the CI files
+ruff==0.16.8              # same version as the CI lint jobs (RUFF_VERSION)
+matplotlib==3.11.2        # ttg.bench.ledger waterfall PNG (optional)
+nbformat==5.11.1          # M12 workshop notebook
+nbclient==0.11.0
+ipykernel==7.4.0

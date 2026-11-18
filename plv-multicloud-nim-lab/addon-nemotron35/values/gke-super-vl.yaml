@@ -1,0 +1,29 @@
+# Add-on overlay: Nemotron 3.5 Super VL (120B-A12B) NVFP4 on ONE RTX PRO 6000 Blackwell (96 GB) - GKE G4.
+# A1 math: 75.0 GB checkpoint + 2 GB runtime leaves ~9 GB for KV (4 KiB/token FP8) + SSM state (170 MB/sequence).
+# NIM matrix lists NVFP4 TP1/TP2 profiles; whether RTX PRO 6000 is VERIFIED for this model is a day-0 question.
+llm:
+  image:
+    repository: nvcr.io/nim/nvidia/nemotron-3.5-super-vl-120b-a12b   # VERIFY the repository name in the NGC catalog too
+    tag: "VERIFY-in-NGC"                 # the chart refuses to render until you replace this
+  servedModelName: nvidia/nemotron-3.5-super-vl-120b-a12b
+  extraEnv:
+    - {name: NIM_MODEL_NAME, value: nvidia/nemotron-3.5-super-vl-120b-a12b}
+  precision: nvfp4
+  profile: ""                            # let NIM choose, then pin the NVFP4 TP1 profile list-model-profiles shows
+  maxModelLen: 16384
+  extraArgs: ""                          # add reasoning/tool parser flags from the model card / NIM docs once verified
+  cache:
+    mode: emptydir
+    emptyDirSizeLimit: 150Gi             # GKE GPU node boot disk is 200 GB (infra/terraform/gcp)
+  lora:
+    enabled: false                       # NVFP4 profiles have no LoRA (BF16 TP2+ profiles do)
+  startupFailureThreshold: 540
+api:
+  routing: {stableModel: "", canaryModel: "", canaryWeight: 0}
+  llmExtraBody:
+    chat_template_kwargs: {enable_thinking: false}
+bench:
+  toolbox:
+    enabled: false
+networkPolicy:
+  allowNamespaces: [plv-serving]

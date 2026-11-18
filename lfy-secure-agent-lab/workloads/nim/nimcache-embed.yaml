@@ -1,0 +1,22 @@
+# NeMo Retriever embedding NIM (renamed from llama-3.2-nv-embedqa-1b-v2). Cache all profiles:
+# the model is small, and the runtime picks a profile that fits the 1g slice.
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: agent-embed
+  namespace: lfy-agent
+spec:
+  source:
+    ngc:
+      modelPuller: ${NIM_EMBED_IMAGE}:${NIM_EMBED_TAG}
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+  storage:
+    pvc:
+      create: true
+      storageClass: azurefile-csi   # standard tier: small model, load speed not critical
+      size: 100Gi
+      volumeAccessMode: ReadWriteMany
+  resources:
+    cpu: "2"
+    memory: 8Gi

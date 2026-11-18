@@ -1,0 +1,26 @@
+# M6: Triton perf_analyzer against the TensorRT engine (🔁 Lab 02). Zero-filled token IDs = valid [PAD] tokens:
+# fine for latency/throughput (accuracy is in the train-export log, metrics.json).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: triage-perf
+  namespace: plv-serving
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: perf
+          image: nvcr.io/nvidia/tritonserver:${PIN_NGC_RELEASE}-py3-sdk
+          command: ["bash", "-c"]
+          args:
+            - |
+              set -e
+              perf_analyzer -m triage_trt -u triage-triton.plv-serving.svc:8001 -i grpc \
+                --shape input_ids:128 --shape attention_mask:128 --input-data zero \
+                --concurrency-range 1:32:4 --measurement-interval 5000 -f /tmp/perf.csv
+              echo "--- perf_analyzer CSV ---"; cat /tmp/perf.csv
+          resources:
+            requests: {cpu: "1", memory: 1Gi}

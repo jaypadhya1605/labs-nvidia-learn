@@ -1,0 +1,17 @@
+{
+  "_name": "llama-3.1-8b",
+  "_source": "meta-llama/Llama-3.1-8B-Instruct config.json - values verified 2026-10-17 against the ungated mirror unsloth/Llama-3.1-8B-Instruct",
+  "_family_note": "dense decoder, GQA (32 query heads share 8 KV heads), SwiGLU MLP",
+  "architectures": ["LlamaForCausalLM"],
+  "hidden_size": 4096,
+  "num_hidden_layers": 32,
+  "num_attention_heads": 32,
+  "num_key_value_heads": 8,
+  "head_dim": 128,
+  "intermediate_size": 14336,
+  "hidden_act": "silu",
+  "vocab_size": 128256,
+  "tie_word_embeddings": false,
+  "max_position_embeddings": 131072,
+  "torch_dtype": "bfloat16"
+}

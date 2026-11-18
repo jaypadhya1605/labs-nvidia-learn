@@ -1,0 +1,25 @@
+# 🔁 Lab 02, unchanged. Expose vLLM queue metrics (served by NIM LLM 2.x at /v1/metrics) as Kubernetes custom metrics for HPA.
+prometheus:
+  url: http://kps-prometheus.monitoring.svc
+  port: 9090
+rules:
+  default: false
+  custom:
+    - seriesQuery: 'vllm:num_requests_waiting{namespace!="",pod!=""}'
+      resources:
+        overrides:
+          namespace: {resource: "namespace"}
+          pod: {resource: "pod"}
+      name:
+        matches: "^vllm:num_requests_waiting$"
+        as: "vllm_num_requests_waiting"
+      metricsQuery: 'sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+    - seriesQuery: 'vllm:num_requests_running{namespace!="",pod!=""}'
+      resources:
+        overrides:
+          namespace: {resource: "namespace"}
+          pod: {resource: "pod"}
+      name:
+        matches: "^vllm:num_requests_running$"
+        as: "vllm_num_requests_running"
+      metricsQuery: 'sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)'

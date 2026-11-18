@@ -1,0 +1,3 @@
+{# Drill 2 (GPU): a chat template copied from a base-model demo. No role headers and no generation prompt, so the #}
+{# model never sees that it is the assistant's turn. Do not use this anywhere else. #}
+{% for m in messages %}{{ m['content'] }}{% endfor %}

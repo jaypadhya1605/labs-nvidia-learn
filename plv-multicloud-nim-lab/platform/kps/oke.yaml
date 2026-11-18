@@ -1,0 +1,5 @@
+# Per-cluster overrides: an external label so merged data (status reports, remote write) keeps its cloud.
+prometheus:
+  prometheusSpec:
+    externalLabels:
+      cloud: oke

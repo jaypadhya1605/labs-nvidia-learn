@@ -1,0 +1,8 @@
+apiVersion: v2
+name: plover
+description: Plover Assist - one portable NVIDIA NIM serving stack for AKS, GKE, EKS, OKE and on-prem RKE2
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.30.0-0"
+keywords: [nvidia, nim, llm, lora, multicloud]

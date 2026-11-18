@@ -1,0 +1,10 @@
+apiVersion: v2
+name: ttg
+description: >-
+  Tern Travel Group Disruption Concierge (Lab 05) - LangGraph agent API + two MCP tool servers + one inference
+  engine (mock on a laptop; vLLM, SGLang, TensorRT-LLM or NIM on a GPU cluster)
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.30.0-0"
+keywords: [nvidia, agentic-ai, langgraph, mcp, vllm, sglang, tensorrt-llm, nim]

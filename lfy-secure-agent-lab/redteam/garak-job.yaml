@@ -1,0 +1,42 @@
+# M8: garak 0.17 probes against the raw LLM and the guarded gateway. Reports land on the shared results volume.
+# Same probes, same budget, two targets: the difference is what the rails buy you.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: garak-redteam
+  namespace: lfy-bench
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: garak
+          image: python:3.12-slim
+          command: ["bash", "-c"]
+          args:
+            - |
+              set -e
+              pip install -q --no-cache-dir "garak==${GARAK_VERSION}" --extra-index-url https://download.pytorch.org/whl/cpu
+              PROBES="promptinject,latentinjection,encoding,dan"
+              for t in direct guarded; do
+                echo "=== garak -> ${t}"
+                garak --config /cfg/garak-${t}.yaml --target_type openai.OpenAICompatible --target_name "${NIM_LLM_MODEL}" \
+                      --probes "${PROBES}" --report_prefix "lfy-${t}" || echo "garak exited non-zero for ${t} (see log)"
+              done
+              find /results/xdg -name "lfy-*.report.jsonl" -exec cp {} /results/ \;
+              ls -la /results/lfy-*.report.jsonl
+          env:
+            - {name: XDG_DATA_HOME, value: /results/xdg}
+            - {name: OPENAICOMPATIBLE_API_KEY, value: not-used}
+          resources:
+            requests: {cpu: "2", memory: 4Gi}
+            limits: {cpu: "4", memory: 8Gi}
+          volumeMounts:
+            - {name: results, mountPath: /results}
+            - {name: cfg, mountPath: /cfg}
+      volumes:
+        - name: results
+          persistentVolumeClaim: {claimName: bench-results}
+        - name: cfg
+          configMap: {name: garak-config}

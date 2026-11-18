@@ -1,0 +1,57 @@
+# Tenant: Utilization Management - Prior-Auth Clinical Summarizer on the largest MIG slice.
+# Long prompts (~6k tokens) that share policy text -> prefix caching on (PRIORAUTH_CACHE_FLAG).
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: priorauth-llm
+  namespace: kha-um
+  labels:
+    kha.io/tenant: utilization-management
+spec:
+  userID: 1000
+  groupID: 0
+  image:
+    repository: ${NIM_LLM_IMAGE}
+    tag: "${NIM_LLM_TAG}"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: llama-3-1-8b
+      profile: vllm-${LLM_PRECISION}-tp1-pp1
+  env:
+    - name: NIM_PASSTHROUGH_ARGS
+      value: "--max-model-len ${PRIORAUTH_MAX_MODEL_LEN} ${PRIORAUTH_CACHE_FLAG} ${PRIORAUTH_EXTRA_ARGS}"
+  replicas: 1
+  resources:
+    limits:
+      ${MIG_LARGE}: 1
+  nodeSelector:
+    kha.io/pool: mig
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+  metrics:
+    enabled: true
+    serviceMonitor:
+      interval: 15s
+  startupProbe:
+    enabled: true
+    probe:
+      httpGet:
+        path: /v1/health/ready
+        port: 8000
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      failureThreshold: 180

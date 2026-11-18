@@ -1,0 +1,45 @@
+# Template: benchmark one tenant at one load level on the lab cluster and fail on regression vs. a baseline.
+# Use it to gate NIM image upgrades or engine-arg changes. Requires an Entra ID federated credential
+# (OIDC) for the repo and repository variables RG and AKS_NAME.
+name: perf-gate
+on:
+  workflow_dispatch:
+    inputs:
+      preset:
+        description: "bench preset (member | priorauth)"
+        default: member
+      concurrency:
+        description: "single concurrency level"
+        default: "16"
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ vars.RG }}
+          cluster-name: ${{ vars.AKS_NAME }}
+      - name: Benchmark
+        run: |
+          cp env/lab.env.example env/lab.env
+          bench/run_sweep.sh "${{ inputs.preset }}" "${{ inputs.concurrency }}"
+      - name: Gate against baseline
+        run: |
+          CANDIDATE="$(ls -dt results/*/c${{ inputs.concurrency }} | head -1)"
+          python3 bench/perf_gate.py \
+            --baseline "bench/baselines/${{ inputs.preset }}-c${{ inputs.concurrency }}.json" \
+            --candidate "${CANDIDATE}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: perf-results
+          path: results/

@@ -1,0 +1,56 @@
+# Every push: the whole lab minus the clouds. Tests run on the mock; manifests against real CRD schemas.
+name: ci
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck && shellcheck -x $(git ls-files '*.sh')
+      - name: python compiles
+        run: python3 -m py_compile $(git ls-files '*.py')
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - uses: azure/setup-helm@v4
+        with: {version: v3.22.1}
+      - run: pip install -r requirements-dev.txt
+      - name: unit, chart policy, pins, conformance + agentic (mock), MLOps, fleet, data center
+        run: python -m pytest -q tests
+      - name: dashboard ConfigMap is generated from the source
+        run: python observability/build_dashboard.py && git diff --exit-code observability/
+      - name: workshop notebook executes end-to-end (mock endpoint)
+        run: |
+          python workshop/build_notebook.py && git diff --exit-code workshop/plover-workshop.ipynb
+          cd workshop && python -c "import nbformat; from nbclient import NotebookClient; nb=nbformat.read('plover-workshop.ipynb', as_version=4); NotebookClient(nb, timeout=300, kernel_name='python3').execute()"
+      - name: managed scorecard dry run
+        run: python managed/compare.py --mock --n 5
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with: {version: v3.22.1}
+      - name: kubeconform
+        run: curl -sL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz | tar xz -C /usr/local/bin kubeconform
+      - run: pip install pyyaml==6.0.3
+      - run: scripts/gen-crd-schemas.sh .schemas && scripts/validate-manifests.sh
+  terraform:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        stack: [azure, gcp, aws, oci, dc-sim]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform -chdir=infra/terraform/${{ matrix.stack }} fmt -check
+      - run: terraform -chdir=infra/terraform/${{ matrix.stack }} init -backend=false -input=false
+      - run: terraform -chdir=infra/terraform/${{ matrix.stack }} validate

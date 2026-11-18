@@ -1,0 +1,6 @@
+# Per-cluster overrides: an external label so merged data (status reports, remote write) keeps its cloud.
+prometheus:
+  prometheusSpec:
+    externalLabels:
+      cloud: eks
+    storageSpec: {}   # no default StorageClass on this cluster -> emptyDir (metrics lost on restart; fine for a lab)

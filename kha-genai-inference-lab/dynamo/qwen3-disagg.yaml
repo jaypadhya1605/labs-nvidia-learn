@@ -1,0 +1,94 @@
+# M10-C: disaggregated serving - 1 prefill + 1 decode worker, KV blocks moved with NIXL.
+# Honest expectation on NC-series: no InfiniBand/RDMA, so NIXL falls back to a slow path and this is
+# likely SLOWER than aggregated. Measure it, then explain when disaggregation pays off (ND-series + IB).
+apiVersion: nvidia.com/v1beta1
+kind: DynamoGraphDeployment
+metadata:
+  name: qwen3-disagg
+  namespace: kha-dynamo
+spec:
+  components:
+    - name: Frontend
+      type: frontend
+      replicas: 1
+      podTemplate:
+        spec:
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:${DYNAMO_VERSION}
+    - name: VllmDecodeWorker
+      type: decode
+      replicas: 1
+      sharedMemorySize: 16Gi
+      podTemplate:
+        spec:
+          nodeSelector:
+            kha.io/pool: dynamo
+          tolerations:
+            - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+            - {key: kubernetes.azure.com/scalesetpriority, operator: Equal, value: spot, effect: NoSchedule}
+          volumes:
+            - name: model-cache
+              persistentVolumeClaim: {claimName: qwen3-model-cache}
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:${DYNAMO_VERSION}
+              workingDir: /workspace/examples/backends/vllm
+              command: ["python3", "-m", "dynamo.vllm"]
+              args:
+                - --model
+                - ${DYNAMO_MODEL}
+                - --max-model-len
+                - "8192"
+                - --gpu-memory-utilization
+                - "0.85"
+                - --disaggregation-mode
+                - decode
+                - --kv-transfer-config
+                - '{"kv_connector":"NixlConnector","kv_role":"kv_both"}'
+              envFrom:
+                - secretRef: {name: hf-token-secret}
+              env:
+                - {name: HF_HOME, value: /home/dynamo/.cache/huggingface}
+              resources:
+                limits: {nvidia.com/gpu: "1"}
+              volumeMounts:
+                - {name: model-cache, mountPath: /home/dynamo/.cache/huggingface}
+    - name: VllmPrefillWorker
+      type: prefill
+      replicas: 1
+      sharedMemorySize: 16Gi
+      podTemplate:
+        spec:
+          nodeSelector:
+            kha.io/pool: dynamo
+          tolerations:
+            - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+            - {key: kubernetes.azure.com/scalesetpriority, operator: Equal, value: spot, effect: NoSchedule}
+          volumes:
+            - name: model-cache
+              persistentVolumeClaim: {claimName: qwen3-model-cache}
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:${DYNAMO_VERSION}
+              workingDir: /workspace/examples/backends/vllm
+              command: ["python3", "-m", "dynamo.vllm"]
+              args:
+                - --model
+                - ${DYNAMO_MODEL}
+                - --max-model-len
+                - "8192"
+                - --gpu-memory-utilization
+                - "0.85"
+                - --disaggregation-mode
+                - prefill
+                - --kv-transfer-config
+                - '{"kv_connector":"NixlConnector","kv_role":"kv_both"}'
+              envFrom:
+                - secretRef: {name: hf-token-secret}
+              env:
+                - {name: HF_HOME, value: /home/dynamo/.cache/huggingface}
+              resources:
+                limits: {nvidia.com/gpu: "1"}
+              volumeMounts:
+                - {name: model-cache, mountPath: /home/dynamo/.cache/huggingface}

@@ -1,0 +1,92 @@
+# M8: the same two LLM tenants WITHOUT MIG - both request a whole nvidia.com/gpu.
+# Use with platform/set-gpu-mode.sh ts|mps (2 replicas advertised) or full (apply only priorauth-llm-fg).
+# Each vLLM gets 42% of GPU memory so two fit side by side.
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: priorauth-llm-fg
+  namespace: kha-um
+spec:
+  userID: 1000
+  groupID: 0
+  image:
+    repository: ${NIM_LLM_IMAGE}
+    tag: "${NIM_LLM_TAG}"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: llama-3-1-8b
+      profile: vllm-${LLM_PRECISION}-tp1-pp1
+  env:
+    - name: NIM_PASSTHROUGH_ARGS
+      value: "--max-model-len ${PRIORAUTH_MAX_MODEL_LEN} ${PRIORAUTH_CACHE_FLAG} --gpu-memory-utilization 0.42"
+  replicas: 1
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  nodeSelector:
+    kha.io/pool: mig
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+  metrics:
+    enabled: true
+    serviceMonitor:
+      interval: 15s
+---
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: shared-llm-fg
+  namespace: kha-shared
+spec:
+  userID: 1000
+  groupID: 0
+  image:
+    repository: ${NIM_LLM_IMAGE}
+    tag: "${NIM_LLM_TAG}"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: llama-3-1-8b
+      profile: vllm-${LLM_PRECISION}-tp1-pp1
+  env:
+    - name: NIM_PASSTHROUGH_ARGS
+      value: "--max-model-len ${SHARED_MAX_MODEL_LEN} --gpu-memory-utilization 0.42"
+  replicas: 1
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  nodeSelector:
+    kha.io/pool: mig
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+  metrics:
+    enabled: true
+    serviceMonitor:
+      interval: 15s

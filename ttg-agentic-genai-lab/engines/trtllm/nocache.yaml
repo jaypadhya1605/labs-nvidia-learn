@@ -1,0 +1,5 @@
+# "nocache": KV block reuse OFF - every request re-computes the shared ~2K-token system prompt.
+kv_cache_config:
+  enable_block_reuse: false
+  free_gpu_memory_fraction: 0.85
+enable_iter_perf_stats: true

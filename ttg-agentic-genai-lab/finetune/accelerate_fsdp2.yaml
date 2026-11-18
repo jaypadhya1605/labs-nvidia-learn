@@ -1,0 +1,27 @@
+# accelerate launch --config_file finetune/accelerate_fsdp2.yaml finetune/train_lora.py
+# FSDP2: each GPU keeps 1/N of every decoder layer and all-gathers a layer just before it runs, so model memory
+# per GPU drops by N - at the cost of all-gather / reduce-scatter traffic every step (NVLink vs PCIe matters, M7).
+# For an 8B LoRA run DDP is usually the faster choice; FSDP2 is what lets the same script train a 70B model.
+# train_lora.py switches the state dict to FULL_STATE_DICT before the final save, so the adapter is ONE
+# adapter_model.safetensors that vLLM / SGLang can load; SHARDED_STATE_DICT keeps intermediate checkpoints fast.
+# accelerate upcasts the trainable (LoRA) parameters to fp32 under bf16 mixed precision; the frozen base stays bf16.
+compute_environment: LOCAL_MACHINE
+distributed_type: FSDP
+mixed_precision: bf16
+num_machines: 1
+num_processes: 2
+machine_rank: 0
+gpu_ids: all
+main_training_function: main
+rdzv_backend: static
+same_network: true
+use_cpu: false
+debug: false
+fsdp_config:
+  fsdp_version: 2
+  fsdp_auto_wrap_policy: TRANSFORMER_BASED_WRAP
+  fsdp_transformer_layer_cls_to_wrap: LlamaDecoderLayer
+  fsdp_reshard_after_forward: true
+  fsdp_state_dict_type: SHARDED_STATE_DICT
+  fsdp_cpu_ram_efficient_loading: true
+  fsdp_activation_checkpointing: false

@@ -1,0 +1,90 @@
+# 🔁 Lab 02 recording rules (plv: prefix) + Plover SLO alerts. Metric names cover both older and newer vLLM spellings.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: plv-rules
+  namespace: monitoring
+  labels:
+    release: kps
+spec:
+  groups:
+    - name: plv-llm.rules
+      interval: 30s
+      rules:
+        - record: plv:llm_generation_tokens:rate1m
+          expr: sum by (namespace, service) (rate(vllm:generation_tokens_total[1m]))
+        - record: plv:llm_prompt_tokens:rate1m
+          expr: sum by (namespace, service) (rate(vllm:prompt_tokens_total[1m]))
+        - record: plv:llm_requests_success:rate1m
+          expr: sum by (namespace, service) (rate(vllm:request_success_total[1m]))
+        - record: plv:llm_ttft_seconds:p95_5m
+          expr: histogram_quantile(0.95, sum by (le, namespace, service) (rate(vllm:time_to_first_token_seconds_bucket[5m])))
+        - record: plv:llm_itl_seconds:p95_5m
+          expr: |
+            histogram_quantile(0.95, sum by (le, namespace, service) (rate(vllm:inter_token_latency_seconds_bucket[5m])))
+            or
+            histogram_quantile(0.95, sum by (le, namespace, service) (rate(vllm:time_per_output_token_seconds_bucket[5m])))
+        - record: plv:llm_requests_waiting
+          expr: sum by (namespace, service) (vllm:num_requests_waiting)
+        - record: plv:llm_requests_running
+          expr: sum by (namespace, service) (vllm:num_requests_running)
+        - record: plv:llm_kv_cache_usage
+          expr: max by (namespace, service) (vllm:kv_cache_usage_perc) or max by (namespace, service) (vllm:gpu_cache_usage_perc)
+        - record: plv:llm_prefix_cache_hit_ratio:5m
+          expr: |
+            sum by (namespace, service) (rate(vllm:prefix_cache_hits_total[5m]))
+            / clamp_min(sum by (namespace, service) (rate(vllm:prefix_cache_queries_total[5m])), 1)
+    - name: plv-gpu-energy.rules
+      interval: 30s
+      rules:
+        # Device-level fields repeat on every MIG instance series -> max by UUID, never sum.
+        - record: plv:gpu_power_watts
+          expr: max by (Hostname, UUID) (DCGM_FI_DEV_POWER_USAGE)
+        - record: plv:gpu_avg_watts_from_energy:5m
+          expr: max by (Hostname, UUID) (rate(DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION[5m])) / 1000
+        - record: plv:cluster_generated_tokens_per_joule:5m
+          expr: sum(rate(vllm:generation_tokens_total[5m])) / clamp_min(sum(plv:gpu_avg_watts_from_energy:5m), 1)
+        - record: plv:mig_instance_gr_engine_active
+          expr: avg by (Hostname, UUID, GPU_I_PROFILE, GPU_I_ID, namespace, pod) (DCGM_FI_PROF_GR_ENGINE_ACTIVE)
+        - record: plv:gpu_dram_active
+          expr: avg by (Hostname, UUID, GPU_I_PROFILE, GPU_I_ID, namespace, pod) (DCGM_FI_PROF_DRAM_ACTIVE)
+    - name: plv-slo.alerts
+      rules:
+        - alert: PLVChatTTFTSLOBreach
+          expr: plv:llm_ttft_seconds:p95_5m{namespace="plv-serving"} > 1.0
+          for: 10m
+          labels: {severity: page, tenant: plover}
+          annotations:
+            summary: "Plover chat TTFT p95 above 1.0 s for 10 minutes"
+            runbook: "drills/README.md"
+        - alert: PLVQueueBacklog
+          expr: plv:llm_requests_waiting{namespace="plv-serving"} > 16
+          for: 5m
+          labels: {severity: ticket, tenant: plover}
+          annotations:
+            summary: "Plover LLM has more than 16 queued requests for 5 minutes (HPA or capacity issue)"
+        - alert: PLVGpuXidError
+          expr: max by (Hostname, UUID) (DCGM_FI_DEV_XID_ERRORS) > 0
+          for: 1m
+          labels: {severity: page}
+          annotations:
+            summary: "GPU reported an XID error; check driver logs and nvidia-smi on the node"
+    - name: plv-api.rules
+      interval: 30s
+      rules:
+        - record: plv:api_requests:rate5m
+          expr: sum by (route, variant, outcome) (rate(plover_api_requests_total[5m]))
+        - record: plv:api_latency_seconds:p95_5m
+          expr: histogram_quantile(0.95, sum by (le, route) (rate(plover_api_latency_seconds_bucket[5m])))
+        - record: plv:api_schema_valid_ratio:5m
+          expr: sum(rate(plover_api_schema_valid_total{valid="true"}[5m])) / clamp_min(sum(rate(plover_api_schema_valid_total[5m])), 1e-9)
+    - name: plv-release.alerts
+      rules:
+        - alert: PLVCanarySchemaRegression
+          expr: |
+            (sum(rate(plover_api_schema_valid_total{valid="true",variant="canary"}[10m])) / clamp_min(sum(rate(plover_api_schema_valid_total{variant="canary"}[10m])), 1e-9))
+            < (sum(rate(plover_api_schema_valid_total{valid="true",variant="stable"}[10m])) / clamp_min(sum(rate(plover_api_schema_valid_total{variant="stable"}[10m])), 1e-9)) - 0.02
+          for: 10m
+          labels: {severity: page, tenant: plover}
+          annotations:
+            summary: "Canary adapter produces valid JSON 2+ points less often than stable - set canaryWeight to 0 (GitOps revert)"

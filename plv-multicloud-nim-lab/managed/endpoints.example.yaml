@@ -1,0 +1,46 @@
+# M10: the SAME suites against self-hosted NIM and managed endpoints. Copy to managed/endpoints.yaml (git-ignored),
+# enable what you have access to. SYNTHETIC DATA ONLY on hosted endpoints (no PHI without a BAA + region controls).
+# base_url = OpenAI-compatible base WITHOUT /v1. Prices are per 1M tokens, captured 2026-10-15 - re-check before quoting.
+- name: aks-nim-llama8b
+  enabled: true
+  kind: self-hosted
+  base_url: http://localhost:8000          # kubectl --context plv-aks -n plv-serving port-forward svc/plover-llm 8000
+  model: meta/llama-3.1-8b-instruct
+  self_hosted_usd_per_hour: 0.68           # Spot A100 node (selector/instances.yaml); add 1.0/GPU-h for NVAIE via marketplace
+- name: gke-nim-llama8b
+  enabled: false
+  kind: self-hosted
+  base_url: http://localhost:8001          # kubectl --context plv-gke -n plv-serving port-forward svc/plover-llm 8001:8000
+  model: meta/llama-3.1-8b-instruct
+  self_hosted_usd_per_hour: 1.63
+- name: nvidia-api-catalog-lightning
+  enabled: false
+  kind: hosted-trial                       # build.nvidia.com: prototyping/testing only (NVIDIA API Trial ToS)
+  base_url: https://integrate.api.nvidia.com
+  model: nvidia/nemotron-3.5-lightning-30b-a3b   # verify the id: GET /v1/models
+  api_key_env: NVIDIA_API_KEY
+  extra_body: {chat_template_kwargs: {enable_thinking: false}}
+- name: openrouter-lightning
+  enabled: false
+  kind: hosted-pay-per-token
+  base_url: https://openrouter.ai/api
+  model: nvidia/nemotron-3.5-lightning
+  api_key_env: OPENROUTER_API_KEY
+  usd_per_1m_in: 0.025                     # openrouter.ai/nvidia/nemotron-3.5-lightning (2026-10-15)
+  usd_per_1m_out: 0.12
+- name: openrouter-super-vl
+  enabled: false
+  kind: hosted-pay-per-token
+  base_url: https://openrouter.ai/api
+  model: nvidia/nemotron-3.5-super-vl
+  api_key_env: OPENROUTER_API_KEY
+  usd_per_1m_in: 0.15                      # openrouter.ai/nvidia/nemotron-3.5-super-vl (2026-10-15)
+  usd_per_1m_out: 0.50
+- name: azure-foundry-fireworks-lightning
+  enabled: false
+  kind: hosted-pay-per-token               # Microsoft Foundry, Fireworks models: FW-Nemotron-Lightning-3.5-30B-A3B (GA)
+  base_url: https://YOUR-RESOURCE.services.ai.azure.com/openai
+  model: FW-Nemotron-Lightning-3.5-30B-A3B
+  api_key_env: AZURE_AI_API_KEY
+  usd_per_1m_in: null                      # take from the Azure price sheet for your region
+  usd_per_1m_out: null

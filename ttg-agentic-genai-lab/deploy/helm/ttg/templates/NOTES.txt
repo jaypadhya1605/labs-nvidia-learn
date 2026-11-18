@@ -1,0 +1,28 @@
+Tern Travel Group Disruption Concierge ({{ .Values.cloud }}) is installed in namespace {{ .Release.Namespace }}.
+
+{{- if .Values.engine.enabled }}
+Engine : {{ .Values.engine.kind }} / {{ .Values.engine.variant }}  image {{ include "ttg.engineImage" . }}
+         serves "{{ .Values.engine.servedModelName }}" on http://{{ .Values.engine.name }}:8000/v1
+{{- if ne .Values.engine.kind "mock" }}
+         first start downloads the model: watch `kubectl -n {{ .Release.Namespace }} logs -f deploy/{{ .Values.engine.name }}`
+{{- end }}
+{{- else }}
+Engine : none - the agent calls {{ .Values.agent.baseUrl }} (synthetic data only)
+{{- end }}
+{{- if .Values.agent.enabled }}
+Agent  : model "{{ include "ttg.agentModel" . }}", prompt variant {{ include "ttg.agentPromptVariant" . }}, MCP over streamable HTTP
+
+Try one disruption:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ .Values.agent.name }} {{ .Values.agent.port }}:{{ .Values.agent.port }} &
+  curl -s localhost:{{ .Values.agent.port }}/v1/disruptions -H 'Content-Type: application/json' -d '{"scenario_id": "S0003"}' | python3 -m json.tool
+
+Storm-day load test (M9): drive the deployed API (HPA + NetworkPolicy path), then gate the result:
+  python -m ttg.bench.agent_bench --label storm-{{ .Values.cloud }} --engine {{ .Values.engine.kind }} --api http://localhost:{{ .Values.agent.port }} --levels 16,64 --n 128
+  python scripts/gate.py eval results/bench/storm-{{ .Values.cloud }}.json --min-success 0.95
+  raw HTTP view (status codes, no scoring): python scripts/load_api.py --url http://localhost:{{ .Values.agent.port }} --concurrency 64 --n 256
+  and watch the replicas react:  kubectl -n {{ .Release.Namespace }} get hpa -w
+
+helm test {{ .Release.Name }} -n {{ .Release.Namespace }}   # posts {{ .Values.helmTest.scenarioId }} through the agent and expects success
+{{- else }}
+Agent  : not in this release (engine-only, e.g. the M8 VLM next to the main release)
+{{- end }}

@@ -1,0 +1,6 @@
+# trtllm-serve --extra_llm_api_options for Lab 05 "base": BF16 (or the FP8 checkpoint), KV block reuse ON.
+# Keys are TorchLlmArgs / KvCacheConfig names from the TensorRT-LLM LLM API reference (docs 1.4.0rc0).
+kv_cache_config:
+  enable_block_reuse: true          # TensorRT-LLM's prefix caching: reuse KV blocks of identical prompt prefixes
+  free_gpu_memory_fraction: 0.85    # share of FREE memory (after weights) given to the KV cache
+enable_iter_perf_stats: true        # needed for GET /metrics (JSON iteration stats, incl. KV cache reuse counters)

@@ -1,0 +1,6 @@
+# Rendered by scripts/render-cluster-config.sh aks - Azure workload identity for the ESO controller.
+serviceAccount:
+  annotations:
+    azure.workload.identity/client-id: "${AZ_ESO_CLIENT_ID}"
+podLabels:
+  azure.workload.identity/use: "true"

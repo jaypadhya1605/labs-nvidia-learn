@@ -1,0 +1,29 @@
+# On demand: run the conformance + agentic suites against a LIVE OpenAI-compatible endpoint (managed or hosted trial).
+# SYNTHETIC DATA ONLY. Store the key as the repository secret LLM_API_KEY.
+name: conformance
+on:
+  workflow_dispatch:
+    inputs:
+      endpoint: {description: "base URL without /v1 (e.g. https://integrate.api.nvidia.com)", required: true}
+      model: {description: "model id", required: true}
+      extra_body: {description: "JSON merged into requests", default: "{}"}
+permissions:
+  contents: read
+jobs:
+  suites:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r requirements-dev.txt
+      - name: conformance
+        env: {LLM_API_KEY: "${{ secrets.LLM_API_KEY }}"}
+        run: python -m pytest -q tests/conformance --endpoint "${{ inputs.endpoint }}" --model "${{ inputs.model }}" --extra-body '${{ inputs.extra_body }}'
+      - name: agentic (scorecard artifact)
+        if: always()
+        env: {LLM_API_KEY: "${{ secrets.LLM_API_KEY }}"}
+        run: python -m pytest -q tests/agentic --endpoint "${{ inputs.endpoint }}" --model "${{ inputs.model }}" --extra-body '${{ inputs.extra_body }}' --scorecard results/agentic.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: scorecards, path: results/}

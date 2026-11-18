@@ -1,0 +1,80 @@
+# M10-D: same topology as M10-A (2 workers, round-robin) with the TensorRT-LLM backend instead of vLLM.
+# Compare engines at EQUAL KV-cache size, not equal flags:
+#   vLLM --gpu-memory-utilization = fraction of TOTAL GPU memory (weights + KV + activations)
+#   TRT-LLM kv_cache_config.free_gpu_memory_fraction = fraction of FREE memory AFTER weights load
+#   0.40 x 80 GB - ~16.4 GB weights ~= 15.6 GB KV (vLLM)  <=>  ~0.25 x ~62 GB free ~= 15.5 GB KV (TRT-LLM)
+# H100: use --model-path nvidia/Qwen3-8B-FP8 for an FP8 engine (download it in model-cache.yaml first).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qwen3-trtllm-engine
+  namespace: kha-dynamo
+data:
+  agg.yaml: |
+    tensor_parallel_size: 1
+    moe_expert_parallel_size: 1
+    enable_attention_dp: false
+    max_num_tokens: 8192
+    max_batch_size: 64
+    trust_remote_code: true
+    backend: pytorch
+    enable_chunked_prefill: true
+    disable_overlap_scheduler: true
+    kv_cache_config:
+      free_gpu_memory_fraction: 0.25
+      enable_block_reuse: true
+    cuda_graph_config:
+      max_batch_size: 64
+---
+apiVersion: nvidia.com/v1beta1
+kind: DynamoGraphDeployment
+metadata:
+  name: qwen3-trtllm-agg
+  namespace: kha-dynamo
+spec:
+  components:
+    - name: Frontend
+      type: frontend
+      replicas: 1
+      podTemplate:
+        spec:
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/tensorrtllm-runtime:${DYNAMO_VERSION}
+    - name: TrtllmWorker
+      type: worker
+      replicas: 2
+      sharedMemorySize: 8Gi
+      podTemplate:
+        spec:
+          nodeSelector:
+            kha.io/pool: dynamo
+          tolerations:
+            - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+            - {key: kubernetes.azure.com/scalesetpriority, operator: Equal, value: spot, effect: NoSchedule}
+          volumes:
+            - name: model-cache
+              persistentVolumeClaim: {claimName: qwen3-model-cache}
+            - name: engine-config
+              configMap: {name: qwen3-trtllm-engine}
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/tensorrtllm-runtime:${DYNAMO_VERSION}
+              workingDir: /workspace/examples/backends/trtllm
+              command: ["python3", "-m", "dynamo.trtllm"]
+              args:
+                - --model-path
+                - ${DYNAMO_MODEL}
+                - --served-model-name
+                - ${DYNAMO_MODEL}
+                - --extra-engine-args
+                - /config/agg.yaml
+              envFrom:
+                - secretRef: {name: hf-token-secret}
+              env:
+                - {name: HF_HOME, value: /home/dynamo/.cache/huggingface}
+              resources:
+                limits: {nvidia.com/gpu: "1"}
+              volumeMounts:
+                - {name: model-cache, mountPath: /home/dynamo/.cache/huggingface}
+                - {name: engine-config, mountPath: /config}

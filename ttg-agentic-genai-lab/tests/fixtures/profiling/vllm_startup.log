@@ -1,0 +1,14 @@
+2026-10-17T21:00:00.000000000Z (APIServer pid=1) INFO 10-17 21:00:00 [api_server.py:1888] vLLM API server version 0.31.0
+2026-10-17T21:00:00.400000000Z (APIServer pid=1) INFO 10-17 21:00:00 [utils.py:300] non-default args: {'model': 'meta-llama/Llama-3.1-8B-Instruct', 'served_model_name': ['ttg-llm'], 'max_model_len': 16384, 'enable_prefix_caching': True}
+2026-10-17T21:00:07.900000000Z (EngineCore pid=95) INFO 10-17 21:00:07 [gpu_model_runner.py:5256] Starting to load model meta-llama/Llama-3.1-8B-Instruct...
+2026-10-17T21:01:09.800000000Z (EngineCore pid=95) INFO 10-17 21:01:09 [weight_utils.py:524] Time spent downloading weights for meta-llama/Llama-3.1-8B-Instruct: 61.912345 seconds
+2026-10-17T21:01:15.000000000Z (EngineCore pid=95) INFO 10-17 21:01:15 [default_loader.py:485] Loading weights took 5.12 seconds
+2026-10-17T21:01:15.500000000Z (EngineCore pid=95) INFO 10-17 21:01:15 [gpu_model_runner.py:5355] Model loading took 14.99 GiB memory and 67.401234 seconds
+2026-10-17T21:01:52.000000000Z (EngineCore pid=95) INFO 10-17 21:01:52 [gpu_worker.py:693] Available KV cache memory: 54.21 GiB
+2026-10-17T21:01:52.100000000Z (EngineCore pid=95) INFO 10-17 21:01:52 [kv_cache_utils.py:2466] GPU KV cache size: 444,096 tokens, Maximum concurrency for 16,384 tokens per request: 27.11x
+2026-10-17T21:02:01.300000000Z (EngineCore pid=95) INFO 10-17 21:02:01 [gpu_model_runner.py:6855] Graph capturing finished in 9 secs, took 0.54 GiB
+2026-10-17T21:02:01.400000000Z (EngineCore pid=95) INFO 10-17 21:02:01 [core.py:374] init engine (profile, create kv cache, warmup model) took 45.88 s (compilation: 28.20 s)
+2026-10-17T21:02:05.000000000Z (APIServer pid=1) INFO:     Started server process [1]
+2026-10-17T21:02:05.100000000Z (APIServer pid=1) INFO:     Waiting for application startup.
+2026-10-17T21:02:05.200000000Z (APIServer pid=1) INFO:     Application startup complete.
+2026-10-17T21:02:30.000000000Z (APIServer pid=1) INFO:     127.0.0.1:51234 - "GET /health HTTP/1.1" 200 OK

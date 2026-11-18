@@ -1,0 +1,31 @@
+{{- if and .Values.llm.enabled (eq .Values.llm.mode "operator") (eq .Values.llm.cache.mode "nimcache") }}
+{{- if not .Values.llm.cache.storageClass }}{{ fail "llm.cache.storageClass is required when llm.cache.mode=nimcache (an RWX class on this cloud)" }}{{- end }}
+# Pre-cache ONLY the profile we serve (🔁 Lab 02 NIMCache filter): engine + precision + TP + LoRA capability.
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: {{ include "plover.cacheName" . }}
+  labels: {{- include "plover.labels" . | nindent 4 }}
+spec:
+  userID: {{ .Values.llm.userID }}
+  groupID: {{ .Values.llm.groupID }}
+  source:
+    ngc:
+      modelPuller: {{ printf "%s:%s" .Values.llm.image.repository .Values.llm.image.tag }}
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+        engine: vllm
+        precision: {{ .Values.llm.precision }}
+        tensorParallelism: {{ .Values.llm.gpuCount | toString | quote }}
+        lora: {{ .Values.llm.lora.enabled }}
+  storage:
+    pvc:
+      create: true
+      storageClass: {{ .Values.llm.cache.storageClass }}
+      size: {{ .Values.llm.cache.size }}
+      volumeAccessMode: {{ .Values.llm.cache.accessMode }}
+  resources:
+    cpu: "2"
+    memory: 8Gi
+{{- end }}

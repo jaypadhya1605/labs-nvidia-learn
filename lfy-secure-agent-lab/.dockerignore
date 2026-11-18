@@ -1,0 +1,7 @@
+# az acr build uploads the build context: never ship secrets or results into an image
+env/lab.env
+env/outputs.env
+supplychain/keys/
+results/
+platform/.remote-write.values.yaml
+.git/

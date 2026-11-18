@@ -1,0 +1,48 @@
+# KAI Scheduler queues for the reclaim/fair-share demo (M8 part F).
+# kha-um has a guaranteed quota of 1 GPU; claims batch has no quota and runs only on idle (over-quota) capacity.
+apiVersion: scheduling.run.ai/v2
+kind: Queue
+metadata:
+  name: kha
+spec:
+  displayName: kha-department
+  resources:
+    cpu: {quota: -1, limit: -1, overQuotaWeight: 1}
+    gpu: {quota: 2, limit: -1, overQuotaWeight: 1}
+    memory: {quota: -1, limit: -1, overQuotaWeight: 1}
+---
+apiVersion: scheduling.run.ai/v2
+kind: Queue
+metadata:
+  name: kha-um
+spec:
+  parentQueue: kha
+  priority: 200
+  resources:
+    cpu: {quota: -1, limit: -1, overQuotaWeight: 1}
+    gpu: {quota: 1, limit: -1, overQuotaWeight: 1}
+    memory: {quota: -1, limit: -1, overQuotaWeight: 1}
+---
+apiVersion: scheduling.run.ai/v2
+kind: Queue
+metadata:
+  name: kha-shared
+spec:
+  parentQueue: kha
+  priority: 100
+  resources:
+    cpu: {quota: -1, limit: -1, overQuotaWeight: 1}
+    gpu: {quota: 1, limit: -1, overQuotaWeight: 1}
+    memory: {quota: -1, limit: -1, overQuotaWeight: 1}
+---
+apiVersion: scheduling.run.ai/v2
+kind: Queue
+metadata:
+  name: kha-claims-batch
+spec:
+  parentQueue: kha
+  priority: 50
+  resources:
+    cpu: {quota: -1, limit: -1, overQuotaWeight: 1}
+    gpu: {quota: 0, limit: -1, overQuotaWeight: 1}
+    memory: {quota: -1, limit: -1, overQuotaWeight: 1}

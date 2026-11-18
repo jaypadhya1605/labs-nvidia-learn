@@ -1,0 +1,199 @@
+{{- include "ttg.validate" . }}
+{{- if .Values.engine.enabled }}
+{{- $e := .Values.engine }}
+{{- $gpu := include "ttg.isGpuEngine" . }}
+{{- $gpus := include "ttg.engineGpus" . }}
+{{- if eq $e.kind "trtllm" }}
+# trtllm-serve extra LLM API options: KV-cache block reuse is TensorRT-LLM's prefix caching (off for the nocache
+# variant); iteration stats feed GET /metrics (JSON, not Prometheus).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $e.name }}-trtllm-options
+  labels: {{- include "ttg.labels" . | nindent 4 }}
+data:
+  extra-llm-api-options.yaml: |
+    {{- include "ttg.trtllmOptions" . | nindent 4 }}
+---
+{{- end }}
+{{- if and $gpu (eq $e.cache.mode "pvc") }}
+# Model weights survive pod restarts: the first start downloads ~16 GB (8B BF16), every later start reads local disk
+# (M5 I/O: compare cold-start timelines with and without this cache).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $e.name }}-cache
+  labels: {{- include "ttg.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep      # `helm uninstall` must not throw away a 16 GB download
+spec:
+  accessModes: [{{ $e.cache.accessMode }}]
+  {{- with $e.cache.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $e.cache.size }}
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $e.name }}
+  labels: {{- include "ttg.labels" . | nindent 4 }}
+    ttg.io/engine: {{ $e.kind }}
+    ttg.io/variant: {{ $e.variant }}
+spec:
+  {{- if not $e.autoscaling.enabled }}
+  replicas: 1
+  {{- end }}
+  strategy:
+    type: Recreate     # one GPU per replica: a rolling update would leave the new pod Pending on "Insufficient nvidia.com/gpu"
+  selector:
+    matchLabels:
+      app: {{ $e.name }}
+  template:
+    metadata:
+      labels: {{- include "ttg.podLabels" (dict "name" $e.name "component" "engine") | nindent 8 }}
+        ttg.io/engine: {{ $e.kind }}
+        ttg.io/variant: {{ $e.variant }}
+      {{- if eq $e.kind "trtllm" }}
+      annotations:
+        checksum/trtllm-options: {{ include "ttg.trtllmOptions" . | sha256sum | trunc 16 }}
+      {{- end }}
+    spec:
+      {{- if or (eq $e.kind "nim") (eq $e.kind "trtllm") }}
+      {{- if ne .Values.secrets.mode "none" }}
+      imagePullSecrets: [{name: ngc-secret}]
+      {{- end }}
+      {{- else if eq $e.kind "mock" }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if eq $e.kind "nim" }}
+      securityContext:
+        runAsUser: {{ $e.nim.userID }}
+        runAsGroup: {{ $e.nim.groupID }}
+        fsGroup: {{ $e.nim.groupID }}
+      {{- end }}
+      {{- with $e.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $e.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: engine
+          image: {{ include "ttg.engineImage" . }}
+          imagePullPolicy: {{ if eq $e.kind "mock" }}{{ .Values.image.pullPolicy }}{{ else }}{{ $e.pullPolicy }}{{ end }}
+          {{- if eq $e.kind "vllm" }}
+          command: ["vllm", "serve"]
+          args: {{- include "ttg.vllmArgs" . | nindent 12 }}
+          {{- else if eq $e.kind "sglang" }}
+          command: ["python3"]
+          args: {{- include "ttg.sglangArgs" . | nindent 12 }}
+          {{- else if eq $e.kind "trtllm" }}
+          command: ["bash", "-c"]
+          args:
+            - |
+              {{- include "ttg.trtllmScript" . | nindent 14 }}
+          {{- else if eq $e.kind "mock" }}
+          command: ["uvicorn", "ttg.mock.fake_llm:app", "--host", "0.0.0.0", "--port", "8000"]
+          {{- end }}
+          env:
+            {{- if eq $e.kind "nim" }}
+            - name: NGC_API_KEY
+              valueFrom: {secretKeyRef: {name: ngc-api-secret, key: NGC_API_KEY}}
+            - {name: NIM_SERVED_MODEL_NAME, value: {{ $e.servedModelName | quote }}}
+            - {name: NIM_CACHE_PATH, value: /opt/nim/.cache}
+            - {name: NIM_ENABLE_KV_CACHE_REUSE, value: {{ if eq $e.variant "nocache" }}"0"{{ else }}"1"{{ end }}}
+            - {name: NIM_PASSTHROUGH_ARGS, value: {{ printf "--max-model-len %d" (int $e.maxModelLen) | quote }}}
+            {{- with $e.nim.profile }}
+            - {name: NIM_MODEL_PROFILE, value: {{ . | quote }}}
+            {{- end }}
+            {{- else if eq $e.kind "mock" }}
+            - {name: MOCK_FAULTS, value: {{ $e.mock.faults | quote }}}
+            {{- else }}
+            {{- if ne .Values.secrets.mode "none" }}
+            - name: HF_TOKEN
+              valueFrom: {secretKeyRef: {name: hf-token-secret, key: HF_TOKEN, optional: true}}
+            {{- end }}
+            - {name: HF_HOME, value: /cache/hf}
+            {{- end }}
+            {{- with $e.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - {name: http, containerPort: 8000}
+          startupProbe:
+            httpGet: {path: {{ include "ttg.engineHealthPath" . }}, port: http}
+            periodSeconds: 10
+            failureThreshold: {{ if eq $e.kind "mock" }}30{{ else }}{{ $e.startupFailureThreshold }}{{ end }}
+          readinessProbe:
+            httpGet: {path: {{ include "ttg.engineHealthPath" . }}, port: http}
+            periodSeconds: 10
+          resources:
+            {{- if $gpu }}
+            {{- with $e.resources.requests }}
+            requests: {{- toYaml . | nindent 14 }}
+            {{- end }}
+            limits:
+              {{ $e.gpuResource }}: {{ $gpus }}
+              {{- with $e.resources.limits }}
+              {{- toYaml . | nindent 14 }}
+              {{- end }}
+            {{- else }}
+            {{- toYaml $e.mock.resources | nindent 12 }}
+            {{- end }}
+          {{- if $gpu }}
+          volumeMounts:
+            - {name: cache, mountPath: {{ if eq $e.kind "nim" }}/opt/nim/.cache{{ else }}/cache{{ end }}}
+            - {name: dshm, mountPath: /dev/shm}
+            {{- if eq $e.kind "trtllm" }}
+            - {name: trtllm-options, mountPath: /config, readOnly: true}
+            {{- end }}
+            {{- if eq $e.variant "lora" }}
+            - {name: adapters, mountPath: {{ dir $e.lora.path }}, readOnly: true}
+            {{- end }}
+          {{- else }}
+          securityContext: {{- include "ttg.securityContext" . | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+          {{- end }}
+      {{- if $gpu }}
+      volumes:
+        - name: cache
+          {{- if eq $e.cache.mode "pvc" }}
+          persistentVolumeClaim: {claimName: {{ $e.name }}-cache}
+          {{- else }}
+          emptyDir: {sizeLimit: {{ $e.cache.emptyDirSizeLimit }}}
+          {{- end }}
+        - name: dshm
+          emptyDir: {medium: Memory, sizeLimit: {{ $e.shmSize }}}
+        {{- if eq $e.kind "trtllm" }}
+        - name: trtllm-options
+          configMap: {name: {{ $e.name }}-trtllm-options}
+        {{- end }}
+        {{- if eq $e.variant "lora" }}
+        - name: adapters
+          persistentVolumeClaim: {claimName: {{ $e.lora.pvcName }}, readOnly: true}
+        {{- end }}
+      {{- else }}
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 256Mi}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $e.name }}
+  labels: {{- include "ttg.labels" . | nindent 4 }}
+    app: {{ $e.name }}
+spec:
+  selector:
+    app: {{ $e.name }}
+  ports:
+    - {name: http, port: 8000, targetPort: http}
+{{- end }}

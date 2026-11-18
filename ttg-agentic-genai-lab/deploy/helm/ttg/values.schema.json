@@ -1,0 +1,456 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ttg chart values (Lab 05)",
+  "type": "object",
+  "required": [
+    "image",
+    "secrets",
+    "engine",
+    "agent",
+    "mcp"
+  ],
+  "properties": {
+    "cloud": {
+      "enum": [
+        "generic",
+        "kind",
+        "aks",
+        "gke"
+      ]
+    },
+    "image": {
+      "type": "object",
+      "required": [
+        "repository",
+        "tag"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "enum": [
+              "latest",
+              "VERIFY"
+            ]
+          }
+        }
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": [
+            "none",
+            "existing",
+            "external"
+          ]
+        }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "required": [
+        "kind",
+        "variant",
+        "servedModelName",
+        "images",
+        "gpuResource"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "mock",
+            "vllm",
+            "sglang",
+            "trtllm",
+            "nim"
+          ]
+        },
+        "variant": {
+          "enum": [
+            "base",
+            "nocache",
+            "fp8",
+            "fp8kv",
+            "spec",
+            "eager",
+            "lora",
+            "tp2",
+            "pp2",
+            "dp2"
+          ]
+        },
+        "servedModelName": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+        },
+        "maxModelLen": {
+          "type": "integer",
+          "minimum": 1024
+        },
+        "gpuMemoryUtilization": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.98
+        },
+        "gpuResource": {
+          "type": "string",
+          "pattern": "^nvidia\\.com/(gpu|mig-[0-9]g\\.[0-9]+gb)$"
+        },
+        "gpuCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "extraArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "extraEnv": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              }
+            },
+            "not": {
+              "properties": {
+                "name": {
+                  "enum": [
+                    "NGC_API_KEY",
+                    "HF_TOKEN",
+                    "NVIDIA_API_KEY",
+                    "TTG_API_KEY",
+                    "VLLM_SERVER_DEV_MODE",
+                    "TTG_VLM_API_KEY",
+                    "HUGGING_FACE_HUB_TOKEN"
+                  ]
+                }
+              },
+              "required": [
+                "name"
+              ]
+            }
+          }
+        },
+        "images": {
+          "type": "object",
+          "required": [
+            "vllm",
+            "sglang",
+            "trtllm",
+            "nim"
+          ],
+          "properties": {
+            "vllm": {
+              "type": "object",
+              "required": [
+                "repository",
+                "tag"
+              ],
+              "properties": {
+                "repository": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "tag": {
+                  "type": "string",
+                  "minLength": 1,
+                  "not": {
+                    "enum": [
+                      "latest",
+                      "VERIFY"
+                    ]
+                  }
+                }
+              }
+            },
+            "sglang": {
+              "type": "object",
+              "required": [
+                "repository",
+                "tag"
+              ],
+              "properties": {
+                "repository": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "tag": {
+                  "type": "string",
+                  "minLength": 1,
+                  "not": {
+                    "enum": [
+                      "latest",
+                      "VERIFY"
+                    ]
+                  }
+                }
+              }
+            },
+            "trtllm": {
+              "type": "object",
+              "required": [
+                "repository",
+                "tag"
+              ],
+              "properties": {
+                "repository": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "tag": {
+                  "type": "string",
+                  "minLength": 1,
+                  "not": {
+                    "enum": [
+                      "latest",
+                      "VERIFY"
+                    ]
+                  }
+                }
+              }
+            },
+            "nim": {
+              "type": "object",
+              "required": [
+                "repository",
+                "tag"
+              ],
+              "properties": {
+                "repository": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "tag": {
+                  "type": "string",
+                  "minLength": 1,
+                  "not": {
+                    "enum": [
+                      "latest",
+                      "VERIFY"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "lora": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+            },
+            "path": {
+              "type": "string",
+              "pattern": "^/.+/[^/]+$"
+            },
+            "maxRank": {
+              "type": "integer",
+              "enum": [
+                8,
+                16,
+                32,
+                64,
+                128,
+                256
+              ]
+            }
+          }
+        },
+        "cache": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "pvc",
+                "emptydir"
+              ]
+            },
+            "accessMode": {
+              "enum": [
+                "ReadWriteOnce",
+                "ReadWriteMany",
+                "ReadWriteOncePod"
+              ]
+            }
+          }
+        },
+        "autoscaling": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "hpa",
+                "keda"
+              ]
+            },
+            "minReplicas": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maxReplicas": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "fp8Mode": {
+          "type": "string",
+          "enum": [
+            "checkpoint",
+            "online"
+          ]
+        },
+        "sglang": {
+          "type": "object",
+          "properties": {
+            "memFractionStatic": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 0.98
+            }
+          },
+          "required": [
+            "memFractionStatic"
+          ]
+        },
+        "trtllm": {
+          "type": "object",
+          "properties": {
+            "kvCacheFreeFraction": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 0.98
+            },
+            "maxBatchSize": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4096
+            },
+            "maxNumTokens": {
+              "type": "integer",
+              "minimum": 256
+            }
+          },
+          "required": [
+            "kvCacheFreeFraction",
+            "maxBatchSize",
+            "maxNumTokens"
+          ]
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "properties": {
+        "promptVariant": {
+          "enum": [
+            "",
+            "full",
+            "short"
+          ]
+        },
+        "thoughts": {
+          "enum": [
+            "brief",
+            "verbose"
+          ]
+        },
+        "structured": {
+          "enum": [
+            "none",
+            "json_object",
+            "json_schema"
+          ]
+        },
+        "maxSteps": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 64
+        },
+        "maxTokens": {
+          "type": "integer",
+          "minimum": 32
+        },
+        "baseUrl": {
+          "type": "string",
+          "pattern": "^(|https?://.+)$"
+        },
+        "extraEnv": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              }
+            },
+            "not": {
+              "properties": {
+                "name": {
+                  "enum": [
+                    "NGC_API_KEY",
+                    "HF_TOKEN",
+                    "NVIDIA_API_KEY",
+                    "TTG_API_KEY",
+                    "VLLM_SERVER_DEV_MODE",
+                    "TTG_VLM_API_KEY",
+                    "HUGGING_FACE_HUB_TOKEN"
+                  ]
+                }
+              },
+              "required": [
+                "name"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "mcp": {
+      "type": "object"
+    },
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allowNamespaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "engineClients": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          }
+        }
+      }
+    }
+  }
+}

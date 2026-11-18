@@ -1,0 +1,37 @@
+# Argo CD, one per cluster (pull-based GitOps): an ISV never holds credentials into a customer's cluster.
+configs:
+  params:
+    server.insecure: true            # lab: reach it with kubectl port-forward only
+  cm:
+    # Child Applications report real health -> sync waves in the app-of-apps actually wait (Argo CD >= 1.8 needs this).
+    resource.customizations.health.argoproj.io_Application: |
+      hs = {}
+      hs.status = "Progressing"
+      hs.message = ""
+      if obj.status ~= nil and obj.status.health ~= nil then
+        hs.status = obj.status.health.status
+        if obj.status.health.message ~= nil then hs.message = obj.status.health.message end
+      end
+      return hs
+    # Teach Argo CD what "healthy" means for NIM Operator resources (otherwise it marks them Healthy instantly).
+    resource.customizations.health.apps.nvidia.com_NIMService: |
+      hs = {status = "Progressing", message = "waiting for NIMService"}
+      if obj.status ~= nil and obj.status.state ~= nil then
+        if obj.status.state == "Ready" then hs.status = "Healthy"; hs.message = "Ready" end
+        if obj.status.state == "Failed" then hs.status = "Degraded"; hs.message = "Failed - kubectl describe nimservice" end
+      end
+      return hs
+    resource.customizations.health.apps.nvidia.com_NIMCache: |
+      hs = {status = "Progressing", message = "caching model"}
+      if obj.status ~= nil and obj.status.state ~= nil then
+        if obj.status.state == "Ready" then hs.status = "Healthy"; hs.message = "Ready" end
+        if obj.status.state == "Failed" then hs.status = "Degraded"; hs.message = "Failed - check the caching job logs" end
+      end
+      return hs
+dex:
+  enabled: false
+notifications:
+  enabled: false
+server:
+  service:
+    type: ClusterIP

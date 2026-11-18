@@ -1,0 +1,13 @@
+Generating SQLite file base.sqlite from base.nsys-rep
+Processing [base.sqlite] with [/opt/nvidia/nsight-systems-cli/2025.5.1/host-linux-x64/reports/cuda_gpu_kern_sum.py]...
+"Time (%)","Total Time (ns)","Instances","Avg (ns)","Med (ns)","Min (ns)","Max (ns)","StdDev (ns)","Name"
+46.3,10327352338,17505,589965.9,144383.0,27040,3126460,944263.8,"sm90_xmma_gemm_bf16bf16_bf16f32_f32_tn_n_tilesize128x128x64_warpgroupsize1x1x1_execute_segment_k_off_kernel__5x_cublas"
+14.8,3305114764,5152,641520.7,293408.0,287296,2822716,867124.9,"sm90_xmma_gemm_bf16bf16_bf16f32_f32_tn_n_tilesize256x128x64_warpgroupsize2x1x1_execute_segment_k_off_kernel__5x_cublas"
+5.0,1119749165,18912,59208.4,9056.0,6784,2578366,271581.7,"void vllm::act_and_mul_kernel<c10::BFloat16, &vllm::silu_kernel<c10::BFloat16>, (bool)1>(T1 *, const T1 *, int)"
+4.1,916662515,21312,43011.6,19776.0,8928,2586205,199790.1,"void cutlass::device_kernel<flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2>>>>(T1::Params)"
+2.6,587283113,37824,15526.7,3008.0,2719,2517756,139091.1,"std::enable_if<T2>(int)0&&vllm::_typeConvert<T1>::exists, void>::type vllm::fused_add_rms_norm_kernel<c10::BFloat16, (int)8>(T1 *, T1 *, const T1 *, float, int, int)"
+1.9,418362605,18912,22121.5,3871.0,3328,2523870,175248.2,"void vllm::rotary_embedding_kernel<c10::BFloat16, (bool)1>(const long *, T1 *, T1 *, const T1 *, int, long, long, int, int, int)"
+1.2,267676000,4000,66919.0,60000.0,50000,90000,5000.0,"void vllm::cross_device_reduce_1stage<__nv_bfloat16, (int)2>(vllm::RankData *, vllm::RankSignals, vllm::Signal *, __nv_bfloat16 *, int, int)"
+0.9,200000000,3000,66666.7,60000.0,50000,90000,5000.0,"void at::native::sbtopk::gatherTopK<float, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T2 *)"
+0.7,167083069,18880,8849.7,2240.0,1471,2499996,101436.1,"void vllm::reshape_and_cache_flash_kernel<__nv_bfloat16, __nv_bfloat16, (vllm::Fp8KVCacheDataType)0>(const T1 *, const T1 *, T2 *, T2 *, const long *, long, long, long, long, int, int, int, const float *, const float *)"
+0.5,111000000,9000,12333.3,12000.0,10000,20000,1000.0,"void vllm::scaled_fp8_quant_kernel<c10::BFloat16, c10::Float8_e4m3fn>(T2 *, const T1 *, const float *, long)"

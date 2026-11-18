@@ -1,0 +1,51 @@
+# Namespace-per-tenant with GPU ResourceQuotas = isolation boundary + chargeback unit.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kha-um
+  labels:
+    kha.io/tenant: utilization-management
+    kha.io/cost-center: um-clinical-ops
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kha-shared
+  labels:
+    kha.io/tenant: shared-services
+    kha.io/cost-center: member-experience-and-payment-integrity
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kha-bench
+  labels:
+    kha.io/tenant: platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kha-dynamo
+  labels:
+    kha.io/tenant: platform
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: gpu-quota
+  namespace: kha-um
+spec:
+  hard:
+    requests.${MIG_LARGE}: "1"
+    requests.nvidia.com/gpu: "1"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: gpu-quota
+  namespace: kha-shared
+spec:
+  hard:
+    requests.${MIG_MEDIUM}: "2"
+    requests.${MIG_SMALL}: "2"
+    requests.nvidia.com/gpu: "1"

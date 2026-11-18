@@ -1,0 +1,27 @@
+# NEW in Lab 03 (needs the Cilium dataplane from infra/main.bicep): the agent and its tool server may talk ONLY to
+# DNS, the guarded gateway, the KQL engine, and NIMs in their own namespace. No internet = no exfiltration channel,
+# even if a prompt injection convinces the model to try. Defense in depth: this works when the model fails.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: soc-agent-egress-lockdown
+  namespace: lfy-agent
+spec:
+  podSelector:
+    matchExpressions:
+      - {key: app, operator: In, values: [soc-agent, soc-tools]}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: lfy-safety}}
+      ports: [{protocol: TCP, port: 8080}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: lfy-data}}
+      ports: [{protocol: TCP, port: 8080}]
+    - to:
+        - podSelector: {}
+      ports: [{protocol: TCP, port: 8000}, {protocol: TCP, port: 9901}]

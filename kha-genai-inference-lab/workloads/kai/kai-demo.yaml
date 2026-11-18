@@ -1,0 +1,41 @@
+# Claims batch grabs BOTH GPUs of the 2-GPU pool while they are idle (over-quota, preemptible).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kha-kai-demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claims-batch
+  namespace: kha-kai-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: claims-batch
+  template:
+    metadata:
+      labels:
+        app: claims-batch
+        kai.scheduler/queue: kha-claims-batch
+    spec:
+      schedulerName: kai-scheduler
+      priorityClassName: train
+      nodeSelector:
+        kha.io/pool: dynamo
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: kubernetes.azure.com/scalesetpriority
+          operator: Equal
+          value: spot
+          effect: NoSchedule
+      containers:
+        - name: batch
+          image: ${CUDA_BASE_IMAGE}
+          command: ["bash", "-c", "nvidia-smi -L; echo 'claims batch running'; sleep infinity"]
+          resources:
+            limits:
+              nvidia.com/gpu: 1

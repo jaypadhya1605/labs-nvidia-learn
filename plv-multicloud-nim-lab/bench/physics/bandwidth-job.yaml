@@ -1,0 +1,37 @@
+# M3: 🔁 Lab 02's CUDA bandwidth probe, now ONE manifest for every cloud. -arch=native compiles for whatever GPU the
+# pod lands on (A100 sm_80, RTX PRO 6000 sm_120, L40S sm_89, A10 sm_86), so the same Job measures every cloud.
+#   kubectl --context plv-aks create ns plv-bench; kubectl ... -n plv-bench create configmap bw-probe --from-file=bench/physics/bandwidth_probe.cu
+#   scripts/render.sh bench/physics/bandwidth-job.yaml | kubectl --context plv-aks apply -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bw-probe
+  namespace: plv-bench
+  labels: {app: bw-probe}
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels: {app: bw-probe}
+    spec:
+      restartPolicy: Never
+      nodeSelector: {plv.io/pool: gpu}
+      tolerations:   # extra tolerations are harmless on clouds without that taint
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: kubernetes.azure.com/scalesetpriority, operator: Equal, value: spot, effect: NoSchedule}
+        - {key: cloud.google.com/gke-spot, operator: Equal, value: "true", effect: NoSchedule}
+      containers:
+        - name: probe
+          image: ${PIN_CUDA_DEVEL}
+          command: ["bash", "-c"]
+          args:
+            - |
+              set -e
+              nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader || true
+              nvcc -O3 -std=c++17 -arch=native -o /tmp/bw /code/bandwidth_probe.cu
+              /tmp/bw 30
+          resources:
+            limits: {nvidia.com/gpu: 1}
+          volumeMounts: [{name: code, mountPath: /code}]
+      volumes: [{name: code, configMap: {name: bw-probe}}]

@@ -1,0 +1,18 @@
+# OKE (Oracle Cloud, stretch) - 1x A10 24GB. NOT on the NIM verified-GPU list for Llama 3.1 8B: the selector
+# (M0) predicts why it misses the ITL SLO in BF16. Treat this cluster as the "say no with data" exercise.
+cloud: oke
+llm:
+  precision: bf16
+  profile: "vllm-bf16-tp1-pp1-feat_lora"
+  maxModelLen: 4096                        # 24 GB - 15 GiB of weights leaves little KV cache
+  gpuResource: nvidia.com/gpu
+  cache:
+    mode: emptydir
+    emptyDirSizeLimit: 120Gi
+  tolerations:
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+networkPolicy:
+  enabled: false                           # flannel does not enforce NetworkPolicy
+bench:
+  toolbox:
+    enabled: true

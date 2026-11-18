@@ -1,0 +1,16 @@
+# accelerate launch --config_file finetune/accelerate_ddp.yaml finetune/train_lora.py
+# DDP: every GPU holds the full BF16 model (16 GB for Llama-3.1-8B) and its own micro-batches; gradients of the
+# 42 M LoRA parameters are all-reduced each step. Simple and fast when the model fits on one GPU - true here.
+# num_processes = GPUs on this node (override on the command line: --num_processes 8).
+compute_environment: LOCAL_MACHINE
+distributed_type: MULTI_GPU
+mixed_precision: bf16
+num_machines: 1
+num_processes: 2
+machine_rank: 0
+gpu_ids: all
+main_training_function: main
+rdzv_backend: static
+same_network: true
+use_cpu: false
+debug: false

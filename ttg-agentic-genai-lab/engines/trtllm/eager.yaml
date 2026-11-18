@@ -1,0 +1,9 @@
+# "eager": CUDA graphs OFF (decode launches every kernel from Python - shows the CPU launch overhead graphs remove).
+# VERIFY for your tag: in the PyTorch backend cuda_graph_config: null disables CUDA graphs (docs 1.4.0rc0 list
+# cuda_graph_config = DecodeCudaGraphConfig{batch_sizes, max_batch_size, enable_padding, mode}). If your tag rejects
+# null, delete this key and run 'trtllm-serve serve --help' to find the switch.
+kv_cache_config:
+  enable_block_reuse: true
+  free_gpu_memory_fraction: 0.85
+cuda_graph_config: null
+enable_iter_perf_stats: true

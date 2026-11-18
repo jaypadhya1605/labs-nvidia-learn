@@ -1,0 +1,28 @@
+# Lab 02 callback: identical NIMCache to Lab 02's prior-auth model - same image, same vLLM profile filter, groupID 0 (PB6).
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: llama-3-1-8b
+  namespace: lfy-agent
+spec:
+  userID: 1000
+  groupID: 0
+  source:
+    ngc:
+      modelPuller: ${NIM_LLM_IMAGE}:${NIM_LLM_TAG}
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+        engine: vllm
+        precision: ${LLM_PRECISION}
+        tensorParallelism: "1"
+        lora: false
+  storage:
+    pvc:
+      create: true
+      storageClass: azurefile-csi-premium
+      size: 100Gi
+      volumeAccessMode: ReadWriteMany
+  resources:
+    cpu: "2"
+    memory: 8Gi

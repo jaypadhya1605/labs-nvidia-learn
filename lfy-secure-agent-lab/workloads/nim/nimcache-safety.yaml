@@ -1,0 +1,28 @@
+# Content-safety model (Nemotron Safety Guard 8B v3). Filter to vLLM + BF16 + TP1, like Lab 02 - but no LoRA filter:
+# safety models may ship as adapters, and we want whatever profile the NIM needs.
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: safety-guard
+  namespace: lfy-safety
+spec:
+  userID: 1000
+  groupID: 0
+  source:
+    ngc:
+      modelPuller: ${NIM_SAFETY_IMAGE}:${NIM_SAFETY_TAG}
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+        engine: vllm
+        precision: bf16
+        tensorParallelism: "1"
+  storage:
+    pvc:
+      create: true
+      storageClass: azurefile-csi-premium
+      size: 100Gi
+      volumeAccessMode: ReadWriteMany
+  resources:
+    cpu: "2"
+    memory: 8Gi

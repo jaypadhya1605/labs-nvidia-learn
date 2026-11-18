@@ -1,0 +1,42 @@
+# Supporting model: policy-retrieval embeddings on a 1g slice.
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: policy-embed
+  namespace: kha-shared
+  labels:
+    kha.io/tenant: shared-services
+spec:
+  image:
+    repository: ${NIM_EMBED_IMAGE}
+    tag: "${NIM_EMBED_TAG}"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: nemotron-embed
+      profile: ''
+  replicas: 1
+  resources:
+    limits:
+      ${MIG_SMALL}: 1
+  nodeSelector:
+    kha.io/pool: mig
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+  metrics:
+    enabled: true
+    serviceMonitor:
+      interval: 30s

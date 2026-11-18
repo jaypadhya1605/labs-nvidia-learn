@@ -1,0 +1,28 @@
+# GKE - 🔁 Lab 04's cluster: 1x RTX PRO 6000 Blackwell 96GB (G4), Spot. Blackwell runs the FP8 variants natively.
+#   helm upgrade --install ttg deploy/helm/ttg -n ttg --create-namespace -f deploy/values/gke.yaml \
+#     --set image.repository=$TTG_IMAGE --set image.tag=<commit> --wait --timeout 45m
+cloud: gke
+image:
+  repository: registry.gitlab.com/your-group/ttg-agentic-genai-lab/ttg-agent
+  tag: "1.0.0"
+imagePullSecrets: [{name: gitlab-registry}]
+secrets:
+  mode: external                     # 🔁 Lab 04: ClusterSecretStore plv-cloud-secrets -> Google Secret Manager
+engine:
+  kind: vllm
+  variant: base
+  cache:
+    mode: emptydir                   # 🔁 Lab 04 ADR-05: G4 nodes use Hyperdisk / local SSD; each pod downloads once
+    emptyDirSizeLimit: 80Gi
+  nodeSelector:
+    plv.io/pool: gpu
+  tolerations:
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  autoscaling:
+    enabled: false
+agent:
+  autoscaling: {enabled: true, minReplicas: 2, maxReplicas: 10, targetCPUUtilizationPercentage: 70}
+serviceMonitor:
+  enabled: true
+networkPolicy:
+  enabled: true                      # Dataplane V2 enforces it (🔁 Lab 04)

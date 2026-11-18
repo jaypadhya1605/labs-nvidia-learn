@@ -1,0 +1,22 @@
+# GKE only admits system-node-critical / system-cluster-critical pods outside kube-system when a ResourceQuota
+# scoped to those priority classes exists in the namespace. The GPU Operator's daemonsets use them.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gpu-operator
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: gpu-operator-quota
+  namespace: gpu-operator
+spec:
+  hard:
+    pods: 100
+  scopeSelector:
+    matchExpressions:
+      - operator: In
+        scopeName: PriorityClass
+        values:
+          - system-node-critical
+          - system-cluster-critical

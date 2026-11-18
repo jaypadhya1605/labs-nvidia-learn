@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "plover chart values",
+  "type": "object",
+  "required": [
+    "llm",
+    "api",
+    "secrets"
+  ],
+  "properties": {
+    "cloud": {
+      "enum": [
+        "generic",
+        "aks",
+        "gke",
+        "eks",
+        "oke",
+        "rke2"
+      ]
+    },
+    "secrets": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": [
+            "external",
+            "existing"
+          ]
+        }
+      }
+    },
+    "llm": {
+      "type": "object",
+      "required": [
+        "image",
+        "mode",
+        "cache",
+        "gpuResource"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "operator",
+            "deployment"
+          ]
+        },
+        "precision": {
+          "enum": [
+            "bf16",
+            "fp8",
+            "nvfp4",
+            "w4a16"
+          ]
+        },
+        "image": {
+          "type": "object",
+          "required": [
+            "repository",
+            "tag"
+          ],
+          "properties": {
+            "tag": {
+              "type": "string",
+              "not": {
+                "enum": [
+                  "latest",
+                  ""
+                ]
+              }
+            }
+          }
+        },
+        "gpuResource": {
+          "type": "string",
+          "pattern": "^nvidia\\.com/(gpu|mig-[0-9]g\\.[0-9]+gb)$"
+        },
+        "gpuCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxModelLen": {
+          "type": "integer",
+          "minimum": 512
+        },
+        "cache": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "nimcache",
+                "emptydir",
+                "hostpath"
+              ]
+            },
+            "accessMode": {
+              "enum": [
+                "ReadWriteMany",
+                "ReadWriteOnce",
+                "ReadOnlyMany"
+              ]
+            }
+          }
+        },
+        "lora": {
+          "type": "object",
+          "properties": {
+            "refreshSeconds": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "adapters": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "ref"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+                  },
+                  "ref": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9.-]+(:[0-9]+)?/.+[:@].+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "extraEnv": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Z_][A-Z0-9_]*$"
+              }
+            },
+            "not": {
+              "properties": {
+                "name": {
+                  "const": "NGC_API_KEY"
+                }
+              },
+              "required": [
+                "name"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "api": {
+      "type": "object",
+      "properties": {
+        "routing": {
+          "type": "object",
+          "properties": {
+            "canaryWeight": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        },
+        "llmExtraBody": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}
