@@ -1,0 +1,30 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<style>
+td:first-child{width:300px}
+td:nth-child(2){width:330px}
+td:nth-child(4){width:90px;text-align:center}
+td:first-child b{color:var(--az-d)} td:nth-child(2) b{color:var(--nv-d)}
+th:first-child{background:var(--az-l);color:var(--az-d)} th:nth-child(2){background:var(--nv-l);color:var(--nv-d)}
+.ph{font-weight:700;font-size:13.5px;color:var(--muted)}
+</style></head><body><div class="page">
+<div class="hdr"><div class="kicker">Field note 3 · Translate what you already know</div>
+<h1>Azure SE → NVIDIA SA translation map</h1>
+<div class="sub">Start every NVIDIA answer from an Azure concept you've already sold and deployed. Then name the difference: on NVIDIA, <b>you own the GPU</b>.</div></div>
+<div class="wrap"><table>
+<tr><th>As an Azure SE, I know…</th><th>NVIDIA equivalent</th><th>The difference to say out loud</th><th>Lab</th></tr>
+<tr><td><b>Foundry model deployment</b> (serverless, PTU)</td><td><b>NIM</b>: model container with an OpenAI-compatible API</td><td>Self-hosted: you choose the GPU, the profile and the uptime. NIM picks an optimized engine profile per GPU, so check which one it chose.</td><td class="ph">P1→P3</td></tr>
+<tr><td><b>TPM / PTU capacity planning</b></td><td><b>GPU sizing</b>: tokens/s per GPU; VRAM = weights + KV cache</td><td>Hosted: TPM counts <i>max_tokens</i> (the AI-Q 429 lesson). On a GPU, KV-cache memory is what limits concurrency.</td><td class="ph">P2·P3</td></tr>
+<tr><td><b>AKS GPU node pool</b> (managed driver + device plugin)</td><td><b>GPU Operator</b>: driver, container toolkit, device plugin, DCGM, MIG manager</td><td>Use one GPU manager, not two. The lab uses AKS-managed drivers and does not install GPU Operator.</td><td class="ph">P3</td></tr>
+<tr><td><i class="muted">No direct Azure equivalent</i></td><td><b>NIM Operator</b>: NIMCache + NIMService CRDs</td><td>Manages the model and its cache, not the GPU. The 21 GB cache on emptyDir moves to a PVC so restarts are fast.</td><td class="ph">P3</td></tr>
+<tr><td><b>Azure ML online endpoint</b></td><td><b>Triton Inference Server</b>: multi-framework, dynamic batching, ensembles, metrics</td><td>Triton is the serving layer. The TRT-LLM backend runs LLMs inside it.</td><td class="ph">P4</td></tr>
+<tr><td><b>ONNX Runtime / Olive</b> optimization</td><td><b>TensorRT-LLM</b>: optimized kernels, in-flight batching, paged KV, FP8/FP4</td><td>An engine, not a server. Serve it with <span class="mono">trtllm-serve</span> or Triton. Precision depends on the GPU generation.</td><td class="ph">P4</td></tr>
+<tr><td><b>APIM AI gateway</b> (load-balance, token limits)</td><td><b>Dynamo</b> (KV-aware routing, disaggregated prefill/decode) · <b>Switchyard</b> (model routing)</td><td>APIM routes HTTP. Dynamo routes by KV-cache state across engine workers. Switchyard escalates to bigger models only when needed.</td><td class="ph">P4*</td></tr>
+<tr><td><b>Content Safety / Prompt Shields</b></td><td><b>NeMo Guardrails</b>: input, retrieval and output rails (Colang)</td><td>Programmable and self-hosted. Still not proof of HIPAA compliance or access control.</td><td class="ph">P2·P5</td></tr>
+<tr><td><b>Azure AI Search</b> (hybrid / vector)</td><td><b>NeMo Retriever</b> embedding + rerank NIMs · cuVS</td><td>The lab keeps AI Search as the index and uses <span class="mono">nemotron-3-embed-1b</span> (2048-d) for AI-Q.</td><td class="ph">P2</td></tr>
+<tr><td><b>Foundry Agent Service / Semantic Kernel</b></td><td><b>AI-Q blueprint</b> + NeMo Agent Toolkit</td><td>Blueprints are starting points. AI-Q needed an Entra token proxy and call budgets before it was usable here.</td><td class="ph">P2</td></tr>
+<tr><td><b>Foundry evals + App Insights traces</b></td><td><b>AIPerf</b> (TTFT/ITL load) · NeMo Evaluator · <b>DCGM</b></td><td>Keep endpoint speed and answer quality as separate measurements. GenAI-Perf is being phased out; AIPerf replaces it.</td><td class="ph">P2·P4</td></tr>
+<tr><td><b>Azure ML fine-tuning</b></td><td><b>NeMo Customizer</b> / NeMo framework LoRA</td><td>The adapter must match the base model and the serving engine's LoRA support.</td><td class="ph">P4*</td></tr>
+<tr><td><b>VM SKUs</b>: NC A100 v4 · ND H100 v5</td><td><b>GPU generations</b>: Ampere A100 · Hopper H100 (FP8) · Blackwell (FP4)</td><td>A100 has no native FP8/FP4, so the lab's FP8/FP4 weights ran weight-only through Marlin kernels.</td><td class="ph">P3</td></tr>
+</table></div>
+<div class="foot"><b>Pattern for any NVIDIA question:</b> “On Azure I'd use <b>X</b>. The NVIDIA building block is <b>Y</b>. The trade-off is control vs. operations: you gain <b>latency, cost-per-token and data control</b>, and you take on <b>sizing, patching and uptime</b>.” &nbsp;<span style="color:#9FB3C6">* = conditional track</span></div>
+</div></body></html>

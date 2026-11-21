@@ -1,0 +1,40 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<style>
+.stack{display:grid;grid-template-columns:200px 1fr 430px;gap:0;row-gap:10px}
+.lab{font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;padding-right:14px;text-align:right;justify-content:flex-end}
+.layer{border-radius:12px;padding:12px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:#fff}
+.layer .blk{background:rgba(255,255,255,.17);border:1px solid rgba(255,255,255,.35);border-radius:9px;padding:6px 12px;font-weight:600;font-size:16px}
+.layer .what{font-size:14.5px;opacity:.92;flex-basis:100%;margin-top:2px}
+.ev{font-size:14px;line-height:1.38;padding:10px 14px;margin-left:14px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--nv);border-radius:10px;display:flex;align-items:center}
+.ev.none{border-left-color:var(--plan);color:var(--muted)}
+.L9{background:#3D4B59}.L8{background:#5B4AA8}.L7{background:#6B4FBB}.L6{background:#4E7A00}.L5{background:#5E9000}.L4{background:#76B900;color:#14210A}
+.L4 .blk{background:rgba(255,255,255,.45);border-color:rgba(0,0,0,.12)} .L3{background:#0A5394}.L2{background:#0078D4}.L1{background:#0B1F33}
+.one{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:22px}
+.one .card{padding:14px 16px}
+.one b{display:block;font-size:22px;margin-bottom:2px}
+.one span{font-size:14.5px;color:var(--muted)}
+</style></head><body><div class="page">
+<div class="hdr"><div class="kicker">Field note 4 · Draw this on any whiteboard</div>
+<h1>The NVIDIA inference stack, bottom to top</h1>
+<div class="sub">Every NVIDIA product sits on one layer. Most interview confusion comes from treating two layers as one product.</div></div>
+<div class="wrap">
+<div class="stack">
+ <div class="lab">Apps / blueprints</div><div class="layer L9"><span class="blk">AI-Q blueprint</span><span class="blk">NeMo Agent Toolkit</span><span class="blk">NeMo Guardrails</span><span class="blk">NeMo Retriever</span><div class="what">Reference apps and safety. Your customer's use case lives here.</div></div><div class="ev">AI-Q 2.2.1 on AKS (CPU pool) · Guardrails planned P2/P5</div>
+ <div class="lab">K8s lifecycle</div><div class="layer L8"><span class="blk">NIM Operator</span><span class="blk">GPU Operator</span><span class="blk">Helm</span><div class="what">NIM Operator manages models + caches. GPU Operator manages drivers + device plugin on nodes.</div></div><div class="ev">AKS-managed driver/device plugin · NIM Operator chart 3.1.4 available, not installed</div>
+ <div class="lab">Multi-engine orchestration</div><div class="layer L7"><span class="blk">Dynamo</span><div class="what">Coordinates engines: KV-aware routing, disaggregated prefill/decode. Does not replace them.</div></div><div class="ev none">Conditional P4 track: needs multi-GPU to claim distributed gains</div>
+ <div class="lab">Packaging</div><div class="layer L6"><span class="blk">NIM</span><div class="what">Container = model + optimized profile per GPU + OpenAI API + license terms.</div></div><div class="ev"><span>NIM 2.1.6 · Nemotron 3.5 Lightning 30B-A3B · profile <span class="mono">vllm-int4-tp1-pp1</span></span></div>
+ <div class="lab">Serving</div><div class="layer L5"><span class="blk">Triton Inference Server</span><span class="blk">trtllm-serve</span><span class="blk">vllm serve</span><div class="what">HTTP/gRPC endpoint, scheduling, metrics. Triton hosts the TRT-LLM backend.</div></div><div class="ev none">P4: Triton + TRT-LLM lane and a standalone trtllm-serve lane</div>
+ <div class="lab">Engines</div><div class="layer L4"><span class="blk">TensorRT-LLM</span><span class="blk">vLLM</span><span class="blk">SGLang</span><div class="what">Where tokens are computed: in-flight batching, paged KV cache, quantization, CUDA graphs.</div></div><div class="ev"><b>Finding:</b>&nbsp;our NIM actually ran on vLLM 0.32.0, not TRT-LLM</div>
+ <div class="lab">CUDA libraries</div><div class="layer L3"><span class="blk">cuBLAS</span><span class="blk">cuDNN</span><span class="blk">NCCL</span><span class="blk">CUTLASS</span><span class="blk">FlashAttention / Marlin kernels</span><div class="what">The math kernels the engines call. NCCL handles multi-GPU communication.</div></div><div class="ev">Marlin: FP8/FP4 weights run weight-only on A100</div>
+ <div class="lab">Driver + runtime</div><div class="layer L2"><span class="blk">NVIDIA driver</span><span class="blk">CUDA runtime</span><span class="blk">container toolkit</span><div class="what">The CUDA version shown in nvidia-smi is the driver's maximum, not proof the toolkit is installed.</div></div><div class="ev">Driver 580.159.04 · CUDA 13.0 · MIG disabled</div>
+ <div class="lab">Hardware</div><div class="layer L1"><span class="blk">GPU + HBM</span><span class="blk">NVLink / NVSwitch</span><span class="blk">InfiniBand / RoCE</span><div class="what">Memory bandwidth bounds decode; interconnect bounds multi-GPU scale.</div></div><div class="ev">A100 80 GB PCIe · Standard_NC24ads_A100_v4 Spot</div>
+</div>
+<div class="one">
+ <div class="card"><b style="color:var(--nv-d)">NIM</b><span>is <b style="display:inline;font-size:inherit">packaging</b>: the box you ship</span></div>
+ <div class="card"><b style="color:var(--nv-d)">Triton</b><span>is <b style="display:inline;font-size:inherit">serving</b>: the door requests come through</span></div>
+ <div class="card"><b style="color:var(--nv-d)">TensorRT-LLM</b><span>is the <b style="display:inline;font-size:inherit">engine</b>: where tokens are made</span></div>
+ <div class="card"><b style="color:var(--az-d)">CUDA</b><span>is the <b style="display:inline;font-size:inherit">runtime</b>: how code reaches the GPU</span></div>
+</div>
+</div>
+<div class="foot"><b>Say it like this:</b> “When a customer says ‘we run NIM,’ my first question is <b>which profile and which engine</b>. On our A100, NIM picked a vLLM INT4 profile, so a NIM-vs-vLLM test would mostly measure packaging. Only a separate TRT-LLM lane actually tests the engine.”</div>
+</div></body></html>

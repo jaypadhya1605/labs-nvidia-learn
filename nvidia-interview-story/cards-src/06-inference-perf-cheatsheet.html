@@ -1,0 +1,81 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<style>
+.two{display:grid;grid-template-columns:1.25fr 1fr;gap:18px}
+.f{background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 16px;margin-bottom:12px}
+.f .t{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--nv-d);margin-bottom:4px}
+.f .eq{font-family:Consolas,monospace;font-size:17px;color:var(--navy);font-weight:700;margin:2px 0 4px}
+.f p{font-size:14.5px;line-height:1.42;color:var(--ink)}
+.f p.m{color:var(--muted)}
+.ex{background:var(--navy);color:#fff;border-radius:14px;padding:16px 20px}
+.ex h3{color:#B5E05A;font-size:16px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.ex .row{display:flex;justify-content:space-between;font-family:Consolas,monospace;font-size:15.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.12)}
+.ex .row:last-of-type{border-bottom:0}
+.ex p{font-size:14.5px;line-height:1.45;margin-top:10px;color:#D5E0EA}
+.knobs{display:flex;flex-wrap:wrap;gap:8px}
+.knobs span{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:14.5px}
+.knobs span b{color:var(--nv-d)}
+svg text{font-family:"Segoe UI";}
+</style></head><body><div class="page">
+<div class="hdr"><div class="kicker">Field note 6 · Numbers an NVIDIA SA does in their head</div>
+<h1>LLM inference performance cheat sheet</h1>
+<div class="sub">Request timeline · prefill vs decode · VRAM and KV-cache math · Little's Law · fair benchmarking (from agent.md)</div></div>
+<div class="wrap">
+<div class="sec nv" style="margin-top:4px">One streaming request, on a timeline</div>
+<div class="card" style="padding:10px 14px">
+<svg width="1460" height="190" viewBox="0 0 1460 190">
+ <line x1="20" y1="80" x2="1370" y2="80" stroke="#5A6977" stroke-width="2"/>
+ <rect x="20" y="55" width="160" height="50" rx="8" fill="#ECEFF3"/><text x="100" y="86" text-anchor="middle" font-size="16" fill="#5A6977" font-weight="600">queue</text>
+ <rect x="185" y="55" width="300" height="50" rx="8" fill="#0078D4"/><text x="335" y="86" text-anchor="middle" font-size="17" fill="#fff" font-weight="700">PREFILL · whole prompt at once</text>
+ <g fill="#76B900">
+  <rect x="495" y="55" width="70" height="50" rx="6"/><rect x="575" y="55" width="70" height="50" rx="6"/><rect x="655" y="55" width="70" height="50" rx="6"/><rect x="735" y="55" width="70" height="50" rx="6"/><rect x="815" y="55" width="70" height="50" rx="6"/><rect x="895" y="55" width="70" height="50" rx="6"/><rect x="975" y="55" width="70" height="50" rx="6"/><rect x="1055" y="55" width="70" height="50" rx="6"/><rect x="1135" y="55" width="70" height="50" rx="6"/><rect x="1215" y="55" width="70" height="50" rx="6"/><rect x="1295" y="55" width="70" height="50" rx="6"/>
+ </g>
+ <text x="1010" y="160" text-anchor="middle" font-size="17" fill="#4E7A00" font-weight="700">DECODE · one token per step (each green block = 1 token)</text>
+ <path d="M20 125 V140 H495 V125" fill="none" stroke="#0A5394" stroke-width="2"/><text x="257" y="160" text-anchor="middle" font-size="16" fill="#0A5394" font-weight="700">TTFT: time to first token</text>
+ <path d="M575 125 V140 H645 V125" fill="none" stroke="#4E7A00" stroke-width="2"/><text x="610" y="160" text-anchor="middle" font-size="16" fill="#4E7A00" font-weight="700">ITL / TPOT</text>
+ <path d="M20 30 V15 H1365 V30" fill="none" stroke="#0B1F33" stroke-width="2"/><text x="692" y="12" text-anchor="middle" font-size="16" fill="#0B1F33" font-weight="700" dy="-0">E2E latency ≈ TTFT + (output tokens − 1) × ITL</text>
+ <text x="1378" y="86" font-size="15" fill="#5A6977">done</text>
+</svg>
+</div>
+
+<div class="two" style="margin-top:16px">
+<div>
+ <div class="f"><div class="t">Prefill vs decode</div><p><b>Prefill is compute-bound</b>: large matrix multiplies over every prompt token, so it drives TTFT. <b>Decode is memory-bandwidth-bound</b>: every step reads all the weights to produce one token per sequence. Batching many sequences shares that read, which is why throughput rises with concurrency.</p></div>
+ <div class="f"><div class="t">Weights</div><div class="eq">VRAM_weights = params × bytes/param</div><p class="m">FP16/BF16 = 2 · FP8 = 1 · INT4 = 0.5 bytes. For MoE, count <b>total</b> params, not active ones.</p></div>
+ <div class="f"><div class="t">KV cache</div><div class="eq">KV/token = 2 × layers × kv_heads × head_dim × bytes</div><p class="m">Multiply by (concurrent sequences × context length). This is what limits concurrency. GQA (fewer KV heads) and an FP8 KV cache shrink it.</p></div>
+ <div class="f"><div class="t">Decode speed ceiling (batch 1)</div><div class="eq">tok/s ≲ memory bandwidth ÷ weight bytes</div><p class="m">A100 80 GB at ~2 TB/s with 16 GB of weights gives a ceiling of ~120 tok/s per sequence. That's why quantization speeds up decode.</p></div>
+ <div class="f"><div class="t">Little's Law (capacity)</div><div class="eq">in-flight = arrival rate × latency</div><p class="m">10 req/s × 4 s = 40 concurrent sequences. That number sizes your KV cache.</p></div>
+ <div class="f"><div class="t">Cost, GPU-only</div><div class="eq">$/1M tok = GPU-hrs × $/GPU-hr ÷ (out tok / 1M)</div><p class="m">Compare only at matched quality and matched P95 SLO. If you don't have a sourced price, leave the cost as N/A.</p></div>
+</div>
+<div>
+ <div class="ex"><h3>Worked sizing · Llama-3.1-8B, FP16</h3>
+  <div class="row"><span>weights 8B × 2 B</span><span>≈ 16 GB</span></div>
+  <div class="row"><span>KV/token 2×32×8×128×2 B</span><span>= 128 KiB</span></div>
+  <div class="row"><span>32 users × 8K context</span><span>= 262K tokens</span></div>
+  <div class="row"><span>KV cache 262K × 128 KiB</span><span>≈ 32 GiB</span></div>
+  <div class="row"><span><b>total + runtime overhead</b></span><span><b>≈ 50 GB</b></span></div>
+  <p>Fits an A100/H100 80 GB with headroom. Doesn't fit a 48 GB L40S as-is: cut concurrency or context, or use FP8 weights + KV.</p>
+ </div>
+ <div class="card" style="margin-top:14px">
+  <div class="sec" style="margin-top:0">Load curve shape (concept, not data)</div>
+  <svg width="560" height="210" viewBox="0 0 560 210">
+   <line x1="50" y1="175" x2="540" y2="175" stroke="#5A6977"/><line x1="50" y1="175" x2="50" y2="15" stroke="#5A6977"/>
+   <path d="M50 165 C150 90, 250 55, 380 45 S520 42, 540 42" fill="none" stroke="#76B900" stroke-width="4"/>
+   <path d="M50 160 C200 155, 330 140, 400 100 S500 30, 530 18" fill="none" stroke="#0078D4" stroke-width="4" stroke-dasharray="8 6"/>
+   <line x1="380" y1="15" x2="380" y2="175" stroke="#C4314B" stroke-dasharray="4 4"/>
+   <text x="388" y="168" font-size="13" fill="#C4314B" font-weight="700">P95 SLO breached</text>
+   <text x="60" y="35" font-size="14" fill="#4E7A00" font-weight="700">throughput (tok/s)</text>
+   <text x="200" y="128" font-size="14" fill="#0A5394" font-weight="700">P95 TTFT / latency</text>
+   <text x="300" y="200" font-size="13" fill="#5A6977" text-anchor="middle">concurrency 1 → 2 → 4 → 8 → 16 → 32</text>
+  </svg>
+  <p style="font-size:14.5px;line-height:1.4">Report the highest throughput <b>before</b> the SLO line, not the peak.</p>
+ </div>
+</div>
+</div>
+
+<div class="sec nv">Optimization knobs (know what each one trades)</div>
+<div class="knobs">
+ <span><b>In-flight / continuous batching</b>: throughput ↑</span><span><b>Paged KV cache</b>: fragmentation ↓</span><span><b>Prefix / KV reuse</b>: shared system prompts</span><span><b>Chunked prefill</b>: smooths ITL under long prompts</span><span><b>Speculative decoding</b>: ITL ↓, extra compute</span><span><b>FP8 / INT4 AWQ</b>: memory ↓, re-check quality</span><span><b>Tensor parallel</b>: fits bigger models, adds NCCL traffic</span><span><b>CUDA graphs</b>: launch overhead ↓</span><span><b>Disaggregated prefill/decode</b>: Dynamo, multi-GPU</span><span><b>MIG</b>: hard isolation, smaller slices</span>
+</div>
+</div>
+<div class="foot"><b>Fair benchmark rules (agent.md):</b> same GPU, weights, dtype, tokenizer and prompts · direct engine endpoints (no Triton on one side only) · warm up first · ≥3 repetitions in ABBA order · AIPerf as the load generator · report P50/P95/P99 · <b>quality gate before speed</b> · never invent numbers: mark unrun steps <b>NOT RUN</b>.</div>
+</div></body></html>

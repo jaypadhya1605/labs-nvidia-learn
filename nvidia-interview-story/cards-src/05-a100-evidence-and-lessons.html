@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<style>
+.nums{grid-template-columns:repeat(4,1fr)}
+.num{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;border-top:5px solid var(--nv)}
+.num .v{font-size:34px;font-weight:700;line-height:1.05;color:var(--navy)}
+.num .k{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--nv-d);margin:4px 0 8px}
+.num p{font-size:14.5px;line-height:1.4;color:var(--ink)}
+.num p b{color:var(--az-d)}
+.less{grid-template-columns:repeat(3,1fr)}
+.ls{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;border-left:5px solid var(--part)}
+.ls h3{font-size:18px;margin-bottom:6px}
+.ls .what{font-size:14.5px;line-height:1.42;margin-bottom:8px}
+.ls .so{font-size:14.5px;line-height:1.42;background:var(--nv-l);border-radius:8px;padding:8px 10px}
+.ls .so b{color:var(--nv-d)}
+</style></head><body><div class="page">
+<div class="hdr"><div class="kicker">Field note 5 · Real evidence, 2026-11-21</div>
+<h1>What the lab actually proved, and what each number means</h1>
+<div class="sub">P3 NIM smoke test on an AKS GPU node pool, plus P2 AI-Q lessons. Interviewers probe numbers, so know the “why” behind each one.</div></div>
+<div class="wrap">
+<div class="sec nv" style="margin-top:4px">P3 · NIM on one A100 80 GB (Spot)</div>
+<div class="grid nums">
+ <div class="num"><div class="v">30B-A3B</div><div class="k">Mixture-of-experts</div><p>30B total parameters, ~3B active per token. <b>It computes like a 3B model but needs memory like a 30B one.</b> Active parameters ≠ resident weights.</p></div>
+ <div class="num"><div class="v">75 GB</div><div class="k">VRAM used of 80</div><p>Not the model size. <b>vLLM pre-allocates most free VRAM for the KV cache.</b> High VRAM use doesn't mean the model is huge.</p></div>
+ <div class="num"><div class="v">99%</div><div class="k">GPU utilization, 246 W</div><p>nvidia-smi “util” = <b>% of time any kernel ran</b>, not how busy the SMs were. Use DCGM SM-activity and Nsight to see real saturation.</p></div>
+ <div class="num"><div class="v">0.67–0.82 s</div><div class="k">3 concurrent requests</div><p>Non-streaming, thinking off. <b>This is not TTFT.</b> TTFT/ITL need a streaming path measured with AIPerf (P2/P4).</p></div>
+ <div class="num"><div class="v">INT4 · TP1</div><div class="k">Profile vllm-int4-tp1-pp1</div><p>Tensor parallel 1 and pipeline parallel 1, so the whole model fits on one GPU. <b>NIM chose vLLM here, not TRT-LLM.</b></p></div>
+ <div class="num"><div class="v">Marlin</div><div class="k">Weight-only kernels</div><p><b>A100 (Ampere) has no native FP8/FP4 tensor cores.</b> Hopper adds FP8 and Blackwell adds FP4. On A100, low-precision weights are dequantized in the kernel.</p></div>
+ <div class="num"><div class="v">~3 min</div><div class="k">Start to /health/ready</div><p>Plus a 10.8 GB image pull (3m16s) and a ~21 GB model cache on emptyDir. <b>NIMCache on a PVC is the fix for fast restarts.</b></p></div>
+ <div class="num"><div class="v">0 keys</div><div class="k">Identity path</div><p>NGC key: Key Vault → private endpoint → CSI driver → K8s secret. App: <b>workload identity</b> → Foundry + Search with no keys.</p></div>
+</div>
+
+<div class="sec" style="margin-top:26px">P2 · Things that went wrong (your best interview stories)</div>
+<div class="grid less">
+ <div class="ls"><h3>The 429 storm</h3><div class="what">One AI-Q deep report made <b>49 model calls and 20 throttled retries</b>. The first run made 340+ calls before it was cancelled. Azure counts each request's <span class="mono">max_tokens</span> against TPM.</div><div class="so"><b>So:</b> agentic fan-out is a capacity problem. Use a dedicated 400K-TPM deployment and enforce a per-report call budget.</div></div>
+ <div class="ls"><h3>The blueprint got it wrong</h3><div class="what">AI-Q missed the pharmacy fax change and returned the general prior-auth fax instead. Its source list also collapsed to one page per file. The simple keyword baseline got it right.</div><div class="so"><b>So:</b> a blueprint is a starting point, not proof of correctness. Independent golden answers caught it.</div></div>
+ <div class="ls"><h3>Static key vs. Entra</h3><div class="what">AI-Q's <span class="mono">nim</span> provider only accepts a static API key. Policy forbids Foundry keys.</div><div class="so"><b>So:</b> a loopback-only sidecar swaps in a refreshed Entra token from workload identity. It's an enterprise-security pattern you can reuse.</div></div>
+ <div class="ls"><h3>Thinking ate the budget</h3><div class="what">Hidden reasoning used all 8,192 output tokens and the request failed with <span class="mono">length</span>.</div><div class="so"><b>So:</b> set <span class="mono">enable_thinking=false</span> for strict-JSON tasks. Reasoning tokens cost latency and money.</div></div>
+ <div class="ls"><h3>Empty agent answer</h3><div class="what">A shallow run hit <span class="mono">max_tool_iterations: 5</span> and returned nothing. AI-Q doesn't force a final answer.</div><div class="so"><b>So:</b> raise the limit to 8 <i>and</i> treat an empty answer as a failure, never as success.</div></div>
+ <div class="ls"><h3>Capacity is not a quota</h3><div class="what">East US 2 had no free Search capacity. PostgreSQL B1ms wasn't available. Spot A100s can be evicted at any time.</div><div class="so"><b>So:</b> check physical allocation at execution time. One Spot GPU is a lab, not HA.</div></div>
+</div>
+</div>
+<div class="foot"><b>Rule:</b> a running pod or a healthy endpoint is not evidence. Evidence is <b>logs + GPU activity during a real request + a passing quality check</b>.</div>
+</div></body></html>

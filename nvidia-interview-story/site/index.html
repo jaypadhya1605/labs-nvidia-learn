@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jay Padhya · NVIDIA Interview Story</title>
+<meta name="description" content="How an Azure Solutions Engineer took a cited healthcare research agent from hosted Nemotron to NIM on an AKS A100, with measured evidence and lessons learned.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: one reading column (~1080px) with full-bleed bands; evidence-first, labeled status everywhere. */
+:root{
+  --bg:#F6F8F5; --surface:#FFFFFF; --ink:#16212B; --muted:#55636F; --line:#DCE3E6;
+  --navy:#0B1F33; --on-navy:#FFFFFF; --on-navy-muted:#B9C7D4;
+  --green:#5E9400; --green-strong:#76B900; --green-soft:#EDF5DC;
+  --blue:#0067B8; --blue-soft:#E3EFFA;
+  --ok:#2E7D3C; --ok-soft:#E2F2E5; --warn:#A35F00; --warn-soft:#FFF0D6; --plan:#5F6C78; --plan-soft:#ECEFF2;
+  --display:"Space Grotesk","Segoe UI",system-ui,sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E141A; --surface:#151E26; --ink:#E6ECF0; --muted:#9BABB8; --line:#26333E;
+  --navy:#08121B; --on-navy:#FFFFFF; --on-navy-muted:#A9B8C5;
+  --green:#8FCB2A; --green-strong:#76B900; --green-soft:#1C2A10;
+  --blue:#5AAEF0; --blue-soft:#12283B;
+  --ok:#6CC77B; --ok-soft:#173022; --warn:#F0B04F; --warn-soft:#33260F; --plan:#A3B0BC; --plan-soft:#222D37;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E141A; --surface:#151E26; --ink:#E6ECF0; --muted:#9BABB8; --line:#26333E;
+  --navy:#08121B; --on-navy:#FFFFFF; --on-navy-muted:#A9B8C5;
+  --green:#8FCB2A; --green-strong:#76B900; --green-soft:#1C2A10;
+  --blue:#5AAEF0; --blue-soft:#12283B;
+  --ok:#6CC77B; --ok-soft:#173022; --warn:#F0B04F; --warn-soft:#33260F; --plan:#A3B0BC; --plan-soft:#222D37;
+  color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--body)}
+a{color:var(--blue)} a:focus-visible,button:focus-visible{outline:3px solid var(--green-strong);outline-offset:2px}
+.wrap{max-width:1080px;margin:0 auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;line-height:1.15;margin:0}
+h2{font-size:clamp(26px,3.4vw,34px);margin-bottom:8px}
+h3{font-size:19px}
+p{margin:0}
+.eyebrow{font:600 12.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--green)}
+.lede{color:var(--muted);max-width:68ch;margin-top:6px}
+section{padding-block:56px;border-top:1px solid var(--line)}
+section .head{display:grid;gap:6px;margin-bottom:26px}
+.mono{font-family:var(--mono);font-size:.92em}
+
+/* hero */
+.hero{background:var(--navy);color:var(--on-navy);padding-block:56px 44px;position:relative}
+.hero::after{content:"";position:absolute;inset:auto 0 0 0;height:6px;background:linear-gradient(90deg,#0078D4 0 50%,var(--green-strong) 50% 100%)}
+.hero .eyebrow{color:var(--green-strong)}
+.hero h1{font-size:clamp(34px,5.4vw,56px);margin:12px 0 14px;max-width:20ch}
+.hero .sub{color:var(--on-navy-muted);font-size:18px;max-width:70ch}
+.hero .links{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.hero .links a{color:var(--on-navy);text-decoration:none;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:8px 14px;font:500 14.5px var(--body)}
+.hero .links a:hover{border-color:var(--green-strong)}
+.proof{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:rgba(255,255,255,.14);border-radius:12px;overflow:hidden;margin-top:34px}
+.proof div{background:var(--navy);padding:16px 18px}
+.proof b{display:block;font:700 28px/1.1 var(--display);color:var(--green-strong)}
+.proof span{font-size:14px;color:var(--on-navy-muted)}
+
+/* chips */
+.chip{display:inline-block;font:600 11.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:5px 9px;border-radius:999px;white-space:nowrap}
+.ok{background:var(--ok-soft);color:var(--ok)} .warn{background:var(--warn-soft);color:var(--warn)} .plan{background:var(--plan-soft);color:var(--plan)}
+
+/* flow */
+.flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;counter-reset:s}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;position:relative}
+.step .who{font:600 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-top:10px}
+.step p{color:var(--muted);font-size:14.5px;margin-top:4px}
+.step h3::before{counter-increment:s;content:counter(s) "  ";color:var(--green);font-family:var(--mono)}
+.az{color:var(--blue)} .nv{color:var(--green)}
+.callout{margin-top:16px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--green-strong);border-radius:10px;padding:14px 18px;max-width:none}
+
+/* gates */
+.gates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.gate{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:grid;gap:8px;align-content:start}
+.gate .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.gate .g{font:600 12.5px var(--mono);color:var(--muted)}
+.gate ul{margin:0;padding-left:18px;font-size:14.5px}
+.gate li{margin:3px 0}
+.gate .next{font-size:13.5px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px}
+
+/* numbers */
+.nums{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.num{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.num b{display:block;font:700 26px/1.1 var(--display)}
+.num .k{font:600 11.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--green);margin:6px 0 6px}
+.num p{font-size:14.5px;color:var(--muted)}
+
+/* lessons */
+.lessons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.lesson{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:grid;gap:8px}
+.lesson p{font-size:15px}
+.lesson .so{background:var(--green-soft);border-radius:8px;padding:9px 12px;font-size:14.5px}
+.lesson .so b{color:var(--green)}
+
+/* tables */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:720px}
+th{text-align:left;font:600 11.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:12px 14px;border-bottom:1px solid var(--line)}
+td{padding:12px 14px;border-top:1px solid var(--line);vertical-align:top;font-size:15px}
+td:first-child{font-weight:600;color:var(--blue)} td:nth-child(2){font-weight:600;color:var(--green)}
+td:last-child{font:600 12.5px var(--mono);color:var(--muted);white-space:nowrap}
+
+/* stack */
+.stack{display:grid;gap:8px}
+.layer{display:grid;grid-template-columns:190px minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px}
+.layer .n{font:600 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.layer .what{font-weight:600}
+.layer .ev{font-size:14px;color:var(--muted)}
+.layer.hl{border-color:var(--green-strong)}
+.say{margin-top:16px;background:var(--navy);color:var(--on-navy);border-radius:12px;padding:16px 20px}
+.say b{color:var(--green-strong)}
+
+/* sizing */
+.two{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px}
+.formula{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px;display:grid;gap:4px}
+.formula code{font:600 15px var(--mono)}
+.formula span{font-size:14px;color:var(--muted)}
+.ledger{background:var(--navy);color:var(--on-navy);border-radius:12px;padding:18px 20px;font-family:var(--mono);font-size:14.5px;font-variant-numeric:tabular-nums}
+.ledger h3{font-family:var(--mono);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--green-strong);margin-bottom:10px}
+.ledger .r{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.12)}
+.ledger p{font-family:var(--body);color:var(--on-navy-muted);font-size:14.5px;margin-top:10px}
+
+/* principles */
+.princ{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.princ div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.princ p{font-size:14.5px;color:var(--muted);margin-top:6px}
+
+/* gallery */
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.gallery a{display:grid;gap:8px;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px}
+.gallery img{width:100%;height:170px;object-fit:cover;object-position:top;border-radius:6px;background:#fff}
+.gallery span{font-size:14px;font-weight:600;padding:0 4px 4px}
+.gallery a:hover{border-color:var(--green-strong)}
+
+/* labs */
+.labs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.labs a{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;text-decoration:none;color:var(--ink);display:grid;gap:6px}
+.labs a:hover{border-color:var(--green-strong)}
+.labs p{font-size:14.5px;color:var(--muted)}
+.labs .mono{color:var(--blue)}
+
+footer{border-top:1px solid var(--line);padding-block:28px 48px;color:var(--muted);font-size:14px}
+
+@media (max-width:900px){
+  .flow{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .gates,.princ{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .nums,.proof{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .two,.lessons,.labs{grid-template-columns:1fr}
+  .layer{grid-template-columns:1fr;gap:4px}
+}
+@media (max-width:560px){
+  .flow,.gates,.princ,.nums{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+ <div class="wrap">
+  <div class="eyebrow">Interview story · NVIDIA Solutions Architect</div>
+  <h1>From a hosted model call to NIM on my own A100</h1>
+  <p class="sub">I'm Jay Padhya, a Solutions Engineer at Microsoft working with healthcare payers and providers. This is one healthcare research agent that I keep re-engineering onto NVIDIA's stack, one gate at a time. Every status on this page is backed by a test, a trace or a measured run.</p>
+  <div class="links">
+   <a href="https://github.com/jaypadhya1605/labs-nvidia-learn/tree/main/nvidia-interview-story">Write-up on GitHub</a>
+   <a href="https://github.com/jaypadhya1605/labs-nvidia-learn">All my NVIDIA labs</a>
+   <a href="https://www.linkedin.com/in/jaykashyappadhya">LinkedIn</a>
+  </div>
+  <div class="proof">
+   <div><b>5 / 5</b><span>golden checks pass on the cited baseline</span></div>
+   <div><b>42</b><span>unit tests across the agent, report, token proxy and embedding probe</span></div>
+   <div><b>A100 80 GB</b><span>NIM serving Nemotron on AKS, GPU activity observed</span></div>
+   <div><b>Keyless</b><span>Entra workload identity; the one NVIDIA key lives in Key Vault</span></div>
+  </div>
+ </div>
+</header>
+
+<main>
+<section id="problem"><div class="wrap">
+ <div class="head"><div class="eyebrow">The customer problem</div>
+ <h2>What changed between two 170-page provider manuals?</h2>
+ <p class="lede">Northstar Provider Operations is a fictional clinic operations team. Its staff must find what changed between the 2025 and 2026 editions of a health plan's public Marketplace provider manual: 343 pages in total. A stale fax number delays prior authorization. A rule that only <em>looks</em> new causes needless process changes. So every answer has to be short, cited to an edition and page, checked by code, and approved by a person.</p></div>
+ <div class="flow">
+  <div class="step"><h3>Ask</h3><p>“What changed in pharmacy routing for 2026?”</p><div class="who az">Ops analyst</div></div>
+  <div class="step"><h3>Retrieve</h3><p>Page-level chunks from both editions, with dated addenda</p><div class="who az">Azure AI Search</div></div>
+  <div class="step"><h3>Generate</h3><p>Structured JSON answer under 50 words, every claim cited</p><div class="who nv">Nemotron 3.5</div></div>
+  <div class="step"><h3>Verify</h3><p>The cited page must exist and contain the fact</p><div class="who">Python checks</div></div>
+  <div class="step"><h3>Approve</h3><p>An ops lead decides whether to change a procedure</p><div class="who" style="color:var(--ok)">Human</div></div>
+ </div>
+ <p class="callout"><b>The NVIDIA arc.</b> Step 3 started as Foundry-hosted Nemotron, paid per token. It now also runs as <b>NIM on an AKS A100</b>. Next comes a controlled comparison of <b>NIM, vLLM and TensorRT-LLM</b> on the same checkpoint. Steps 1, 2, 4 and 5 stay fixed so the comparison measures only the serving change.</p>
+ <p class="lede" style="margin-top:14px">The five golden checks are traps: a real routing change, a new outside vendor, a new restriction layered on an older rule, an ID that did <em>not</em> change, and a 2025 addendum rule that looks new in 2026. Expected answers are written independently and never shown to the model.</p>
+</div></section>
+
+<section id="gates"><div class="wrap">
+ <div class="head"><div class="eyebrow">Six gates, one product</div>
+ <h2>Where the build stands</h2>
+ <p class="lede">The same application is engineered forward. A gate passes only on executed evidence, never on a config file or a healthy pod.</p></div>
+ <div class="gates">
+  <div class="gate"><div class="top"><span class="g">G1 · Foundation</span><span class="chip ok">Passed</span></div><h3>Cited research agent</h3><ul><li>Python + Azure AI Search + hosted Nemotron</li><li>5/5 live golden checks, 18 unit tests</li><li>OpenTelemetry traces in Foundry</li></ul></div>
+  <div class="gate"><div class="top"><span class="g">G2 · Quality + baseline</span><span class="chip warn">In progress</span></div><h3>AI-Q blueprint integration</h3><ul><li>NVIDIA AI-Q 2.2.1 running on AKS</li><li>Entra-only auth through a token-proxy sidecar</li><li>NVIDIA embeddings (2048-d) with the key in Key Vault</li></ul><p class="next">Next: MCP retrieval, NeMo Guardrails, AIPerf streaming TTFT/ITL, MLflow, 20 reviewed cases</p></div>
+  <div class="gate"><div class="top"><span class="g">G3 · NVIDIA on AKS</span><span class="chip warn">Infra verified</span></div><h3>NIM on an A100</h3><ul><li>A100 80 GB Spot pool, tainted and isolated</li><li>NIM serving with observed GPU activity</li><li>Workload identity, private registry, CSI secrets</li></ul><p class="next">Next: NIM Operator (NIMCache + NIMService), Helm chart, golden checks through the GPU path</p></div>
+  <div class="gate"><div class="top"><span class="g">G4 · GPU systems</span><span class="chip plan">Planned</span></div><h3>Engines and profiling</h3><ul><li>trtllm-serve, Triton + TensorRT-LLM, vLLM vs NIM</li><li>AIPerf sweeps, DCGM, Nsight Systems</li><li>A small CUDA kernel with a CPU reference</li></ul></div>
+  <div class="gate"><div class="top"><span class="g">G5 · Security + recovery</span><span class="chip plan">Planned</span></div><h3>Boundaries that hold</h3><ul><li>NeMo Guardrails at deployed boundaries</li><li>401/403 and cross-team isolation tests</li><li>Bounded work and failure drills</li></ul></div>
+  <div class="gate"><div class="top"><span class="g">G6 · Release</span><span class="chip plan">Planned</span></div><h3>Repeatable delivery</h3><ul><li>Terraform, Helm, GitHub Actions, Argo CD</li><li>MLflow-linked quality and performance gates</li><li>A timed, real rollback</li></ul></div>
+ </div>
+</div></section>
+
+<section id="evidence"><div class="wrap">
+ <div class="head"><div class="eyebrow">Measured, not assumed</div>
+ <h2>What one A100 taught me</h2>
+ <p class="lede">From the NIM smoke test on an AKS Spot node (A100 80 GB PCIe, driver 580, CUDA 13.0). These are smoke-test observations, not a benchmark.</p></div>
+ <div class="nums">
+  <div class="num"><b>30B-A3B</b><div class="k">Mixture of experts</div><p>About 3B parameters active per token. It computes like a small model but needs the memory of a 30B one.</p></div>
+  <div class="num"><b>vLLM</b><div class="k">Engine inside NIM</div><p>The selected profile was <span class="mono">vllm-int4-tp1-pp1</span>. A NIM-vs-vLLM test would mostly measure packaging.</p></div>
+  <div class="num"><b>Marlin</b><div class="k">Weight-only kernels</div><p>Ampere has no native FP8/FP4 tensor cores, so low-precision weights are dequantized inside the kernel.</p></div>
+  <div class="num"><b>75 GB</b><div class="k">VRAM in use</div><p>Mostly KV cache that vLLM pre-allocates. High VRAM use doesn't tell you the model size.</p></div>
+  <div class="num"><b>99% · 246 W</b><div class="k">Utilization + power</div><p>nvidia-smi “util” is time-based. DCGM SM activity and Nsight show real saturation.</p></div>
+  <div class="num"><b>0.67–0.82 s</b><div class="k">3 concurrent requests</div><p>Non-streaming, with thinking off. It isn't TTFT; that needs a streaming path and AIPerf.</p></div>
+  <div class="num"><b>~3 min</b><div class="k">Start to ready</div><p>Plus a 10.8 GB image pull and a ~21 GB model cache. A NIMCache on a PVC is the restart fix.</p></div>
+  <div class="num"><b>Keyless</b><div class="k">Identity path</div><p>The NGC key goes Key Vault → private endpoint → CSI. The app uses workload identity for Foundry and Search.</p></div>
+ </div>
+</div></section>
+
+<section id="lessons"><div class="wrap">
+ <div class="head"><div class="eyebrow">What broke, and what I changed</div>
+ <h2>Lessons I'd bring to a customer POC</h2></div>
+ <div class="lessons">
+  <div class="lesson"><h3>Agent fan-out is a capacity problem</h3><p>One AI-Q deep report made 49 model calls plus 20 throttled retries. Hosted TPM limits count each request's <span class="mono">max_tokens</span>, so a shared deployment collapsed under one report.</p><p class="so"><b>Changed:</b> a dedicated deployment sized for the whole workflow, and a per-report call budget that the runtime has to respect.</p></div>
+  <div class="lesson"><h3>A blueprint isn't proof of correctness</h3><p>The AI-Q report was well written but missed the pharmacy routing change. The plain keyword baseline got it right. The source list also collapsed to one page per file.</p><p class="so"><b>Changed:</b> independent golden answers gate every variant. The blueprint stays a comparison path until it passes them.</p></div>
+  <div class="lesson"><h3>Fit the blueprint to the customer's identity model</h3><p>AI-Q's model provider accepts only a static API key, and the environment forbids keys.</p><p class="so"><b>Changed:</b> a loopback-only sidecar swaps in a refreshed Entra token from workload identity. It has 7 tests covering refresh, streaming and 401 handling.</p></div>
+  <div class="lesson"><h3>Reasoning tokens are real tokens</h3><p>Hidden reasoning used all 8,192 output tokens and the structured answer failed with <span class="mono">length</span>.</p><p class="so"><b>Changed:</b> thinking is off for strict-JSON tasks, and an empty or truncated answer is always a failure, never a success.</p></div>
+  <div class="lesson"><h3>Ask which engine is under the package</h3><p>NIM chose a vLLM INT4 profile on Ampere, not TensorRT-LLM.</p><p class="so"><b>Changed:</b> engine comparisons hold weights, tokenizer, GPU and prompts constant, use ABBA ordering and ≥3 repetitions, and put a quality gate before any speed claim.</p></div>
+  <div class="lesson"><h3>Quota isn't capacity</h3><p>The region had no free Search capacity, a database SKU wasn't available, and Spot GPUs can be evicted.</p><p class="so"><b>Changed:</b> check physical allocation at run time, scale the GPU pool to zero after every session, and never call one Spot GPU high availability.</p></div>
+ </div>
+</div></section>
+
+<section id="translate"><div class="wrap">
+ <div class="head"><div class="eyebrow">Azure → NVIDIA</div>
+ <h2>How I translate what customers already run</h2>
+ <p class="lede">Most enterprise customers start from a cloud-managed AI service. The conversation is about what they gain by self-hosting on NVIDIA (latency, cost per token, data control) and what they take on (sizing, patching, uptime).</p></div>
+ <div class="tbl"><table>
+  <tr><th>Azure concept</th><th>NVIDIA building block</th><th>The difference that matters</th><th>Gate</th></tr>
+  <tr><td>Foundry model deployment</td><td>NIM</td><td>You choose the GPU, the profile and the uptime. Check which engine profile NIM selected.</td><td>G1→G3</td></tr>
+  <tr><td>TPM / PTU capacity</td><td>GPU sizing</td><td>VRAM = weights + KV cache. KV cache limits concurrency; tokens/s per GPU sets cost.</td><td>G2·G3</td></tr>
+  <tr><td>AKS GPU node pool</td><td>GPU Operator</td><td>Driver, toolkit, device plugin, DCGM, MIG manager. Run one GPU manager, not two.</td><td>G3</td></tr>
+  <tr><td>(no equivalent)</td><td>NIM Operator</td><td>NIMCache and NIMService manage the model and its cache, not the GPU.</td><td>G3</td></tr>
+  <tr><td>Azure ML online endpoint</td><td>Triton Inference Server</td><td>The serving layer: dynamic batching, ensembles, metrics. Hosts the TensorRT-LLM backend.</td><td>G4</td></tr>
+  <tr><td>ONNX Runtime / Olive</td><td>TensorRT-LLM</td><td>The engine: in-flight batching, paged KV, FP8/FP4 where the GPU supports it.</td><td>G4</td></tr>
+  <tr><td>APIM AI gateway</td><td>Dynamo · Switchyard</td><td>KV-aware routing and disaggregated prefill/decode across engine workers; model escalation.</td><td>G4</td></tr>
+  <tr><td>Content Safety</td><td>NeMo Guardrails</td><td>Programmable input, retrieval and output rails. Not a substitute for access control.</td><td>G2·G5</td></tr>
+  <tr><td>Azure AI Search</td><td>NeMo Retriever NIMs</td><td>Embedding and rerank NIMs. Here they feed an Azure AI Search index.</td><td>G2</td></tr>
+  <tr><td>Foundry Agent Service</td><td>AI-Q + NeMo Agent Toolkit</td><td>Blueprints accelerate the start. Budgets, identity and evals make them production-shaped.</td><td>G2</td></tr>
+  <tr><td>Foundry evals + App Insights</td><td>AIPerf · DCGM · Nsight</td><td>Keep endpoint speed and answer quality as separate measurements.</td><td>G2·G4</td></tr>
+  <tr><td>NC A100 v4 · ND H100 v5</td><td>Ampere · Hopper · Blackwell</td><td>Precision support follows the generation: FP8 arrives with Hopper, FP4 with Blackwell.</td><td>G3</td></tr>
+ </table></div>
+</div></section>
+
+<section id="stack"><div class="wrap">
+ <div class="head"><div class="eyebrow">Whiteboard view</div>
+ <h2>The inference stack, bottom to top</h2></div>
+ <div class="stack">
+  <div class="layer"><span class="n">Apps / blueprints</span><span class="what">AI-Q · NeMo Agent Toolkit · Guardrails · Retriever</span><span class="ev">AI-Q 2.2.1 running on AKS</span></div>
+  <div class="layer"><span class="n">K8s lifecycle</span><span class="what">NIM Operator · GPU Operator · Helm</span><span class="ev">AKS-managed driver today; NIM Operator next</span></div>
+  <div class="layer"><span class="n">Orchestration</span><span class="what">Dynamo</span><span class="ev">Needs multiple GPUs to show distributed gains</span></div>
+  <div class="layer hl"><span class="n">Packaging</span><span class="what">NIM</span><span class="ev">Nemotron 3.5 Lightning NIM on an A100</span></div>
+  <div class="layer"><span class="n">Serving</span><span class="what">Triton · trtllm-serve · vllm serve</span><span class="ev">Triton + TensorRT-LLM lane planned</span></div>
+  <div class="layer hl"><span class="n">Engines</span><span class="what">TensorRT-LLM · vLLM · SGLang</span><span class="ev">This NIM ran on vLLM 0.32.0</span></div>
+  <div class="layer"><span class="n">CUDA libraries</span><span class="what">cuBLAS · cuDNN · NCCL · CUTLASS · kernels</span><span class="ev">Marlin weight-only kernels on Ampere</span></div>
+  <div class="layer"><span class="n">Driver + runtime</span><span class="what">Driver · CUDA runtime · container toolkit</span><span class="ev">Driver 580, CUDA 13.0, MIG off</span></div>
+  <div class="layer"><span class="n">Hardware</span><span class="what">GPU + HBM · NVLink · InfiniBand / RoCE</span><span class="ev">A100 80 GB PCIe, Spot</span></div>
+ </div>
+ <p class="say"><b>NIM</b> is packaging, <b>Triton</b> is serving, <b>TensorRT-LLM</b> is the engine and <b>CUDA</b> is the runtime. When a customer says “we run NIM,” my first question is which profile and which engine.</p>
+</div></section>
+
+<section id="sizing"><div class="wrap">
+ <div class="head"><div class="eyebrow">Numbers I do out loud</div>
+ <h2>Sizing a deployment before buying GPUs</h2></div>
+ <div class="two">
+  <div class="stack">
+   <div class="formula"><code>E2E ≈ TTFT + (output tokens − 1) × ITL</code><span>Prefill is compute-bound and drives TTFT. Decode is memory-bandwidth-bound and drives ITL.</span></div>
+   <div class="formula"><code>KV/token = 2 × layers × kv_heads × head_dim × bytes</code><span>Multiply by concurrent sequences × context length. This, not the weights, usually limits concurrency.</span></div>
+   <div class="formula"><code>decode tok/s ≲ memory bandwidth ÷ weight bytes</code><span>At ~2 TB/s and 16 GB of weights, the batch-1 ceiling is about 120 tok/s. That's why quantization speeds up decode.</span></div>
+   <div class="formula"><code>in-flight = arrival rate × latency</code><span>Little's Law: 10 req/s × 4 s = 40 concurrent sequences to hold in KV cache.</span></div>
+   <div class="formula"><code>$/1M tok = GPU-hrs × $/GPU-hr ÷ (out tok / 1M)</code><span>GPU-only cost, compared at matched quality and matched P95 latency target.</span></div>
+  </div>
+  <div class="ledger"><h3>Worked example · Llama-3.1-8B, FP16</h3>
+   <div class="r"><span>weights 8B × 2 B</span><span>≈ 16 GB</span></div>
+   <div class="r"><span>KV/token 2·32·8·128·2 B</span><span>128 KiB</span></div>
+   <div class="r"><span>32 users × 8K context</span><span>262K tokens</span></div>
+   <div class="r"><span>KV cache</span><span>≈ 32 GiB</span></div>
+   <div class="r"><span>with runtime overhead</span><span>≈ 50 GB</span></div>
+   <p>Fits an 80 GB A100 or H100 with headroom. On a 48 GB L40S, cut concurrency or context, or move weights and KV cache to FP8.</p>
+  </div>
+ </div>
+</div></section>
+
+<section id="principles"><div class="wrap">
+ <div class="head"><div class="eyebrow">How I work</div><h2>Principles behind every gate</h2></div>
+ <div class="princ">
+  <div><h3>Evidence over claims</h3><p>A status changes only with a test, trace or measured run. Unrun steps stay marked as planned.</p></div>
+  <div><h3>Quality before speed</h3><p>A faster engine that fails a golden check isn't a win. Quality gates sit in front of every benchmark.</p></div>
+  <div><h3>One variable at a time</h3><p>Same weights, tokenizer, prompts and GPU across serving lanes. Differences in precision or template get labeled.</p></div>
+  <div><h3>No keys</h3><p>Entra workload identity and Key Vault references throughout. Nothing secret in YAML, logs or source.</p></div>
+  <div><h3>People decide</h3><p>The agent drafts cited findings. A person approves any operational change.</p></div>
+  <div><h3>Cost is a design input</h3><p>Lowest viable SKU, Spot for bounded lab runs, and a scale-to-zero step after every session.</p></div>
+ </div>
+</div></section>
+
+<section id="visuals"><div class="wrap">
+ <div class="head"><div class="eyebrow">Visuals</div><h2>Field notes and architecture diagrams</h2>
+ <p class="lede">Full-resolution images. Diagrams marked “target” are designs for later gates, not deployed systems.</p></div>
+ <div class="gallery">
+  <a href="img/cards/01-lab-on-a-page.png"><img src="img/cards/01-lab-on-a-page.png" alt="One-page summary of the lab: problem, request path, six gates and five golden checks" loading="lazy"><span>The lab on one page</span></a>
+  <a href="img/cards/03-azure-to-nvidia-rosetta.png"><img src="img/cards/03-azure-to-nvidia-rosetta.png" alt="Table translating Azure services to NVIDIA building blocks" loading="lazy"><span>Azure → NVIDIA translation map</span></a>
+  <a href="img/cards/04-nvidia-inference-stack.png"><img src="img/cards/04-nvidia-inference-stack.png" alt="NVIDIA inference stack layers with lab evidence" loading="lazy"><span>NVIDIA inference stack</span></a>
+  <a href="img/cards/05-a100-evidence-and-lessons.png"><img src="img/cards/05-a100-evidence-and-lessons.png" alt="A100 smoke-test numbers explained, plus lessons learned" loading="lazy"><span>A100 evidence and lessons</span></a>
+  <a href="img/cards/06-inference-perf-cheatsheet.png"><img src="img/cards/06-inference-perf-cheatsheet.png" alt="Inference performance cheat sheet with sizing math" loading="lazy"><span>Inference performance cheat sheet</span></a>
+  <a href="img/diagrams/01-sdlc-lifecycle.png"><img src="img/diagrams/01-sdlc-lifecycle.png" alt="Eight-phase SDLC with exit gates" loading="lazy"><span>SDLC: eight phases, eight gates</span></a>
+  <a href="img/diagrams/02-target-reference-architecture.png"><img src="img/diagrams/02-target-reference-architecture.png" alt="Target reference architecture on Azure with NIM GPU pool" loading="lazy"><span>Target reference architecture</span></a>
+  <a href="img/diagrams/03-p2-bounded-report.png"><img src="img/diagrams/03-p2-bounded-report.png" alt="Bounded research report contract" loading="lazy"><span>G2: bounded report contract</span></a>
+  <a href="img/diagrams/04-p3-aks-gpu-inference.png"><img src="img/diagrams/04-p3-aks-gpu-inference.png" alt="AKS design with CPU app pool and GPU NIM pool" loading="lazy"><span>G3: private GPU inference on AKS</span></a>
+  <a href="img/diagrams/05-p4-gpu-system-model.png"><img src="img/diagrams/05-p4-gpu-system-model.png" alt="Host and GPU system model with profiling tools" loading="lazy"><span>G4: GPU system model</span></a>
+  <a href="img/diagrams/06-p5-ownership-boundary.png"><img src="img/diagrams/06-p5-ownership-boundary.png" alt="Server-enforced ownership boundary" loading="lazy"><span>G5: ownership boundary (target)</span></a>
+  <a href="img/diagrams/07-p6-release.png"><img src="img/diagrams/07-p6-release.png" alt="Gated release and rollback flow" loading="lazy"><span>G6: gated release (target)</span></a>
+  <a href="img/diagrams/08-observability.png"><img src="img/diagrams/08-observability.png" alt="Observability design correlating app traces and GPU metrics" loading="lazy"><span>Observability design</span></a>
+  <a href="img/diagrams/09-resilience-path.png"><img src="img/diagrams/09-resilience-path.png" alt="Per-hop resilience and p95 latency budget" loading="lazy"><span>Resilience path and latency budget</span></a>
+  <a href="img/diagrams/10-parallel-async.png"><img src="img/diagrams/10-parallel-async.png" alt="Synchronous fan-out and asynchronous report flow" loading="lazy"><span>Parallel answers, async reports</span></a>
+ </div>
+</div></section>
+
+<section id="labs"><div class="wrap">
+ <div class="head"><div class="eyebrow">More in this repo</div><h2>Other NVIDIA lab guides I built</h2>
+ <p class="lede">Hands-on lab guides with fictional customers and synthetic data. Each README lists its own modules and checks.</p></div>
+ <div class="labs">
+  <a href="https://github.com/jaypadhya1605/labs-nvidia-learn/tree/main/kha-genai-inference-lab"><span class="mono">kha-genai-inference-lab</span><h3>Multi-tenant inference on AKS</h3><p>MIG partitioning, NIM Operator, Dynamo KV-aware routing, AIPerf and a performance gate for a payer-provider.</p></a>
+  <a href="https://github.com/jaypadhya1605/labs-nvidia-learn/tree/main/lfy-secure-agent-lab"><span class="mono">lfy-secure-agent-lab</span><h3>Secure agentic AI</h3><p>A SOC analyst agent that resists prompt injection and never leaks PHI, with measured safety cost.</p></a>
+  <a href="https://github.com/jaypadhya1605/labs-nvidia-learn/tree/main/plv-multicloud-nim-lab"><span class="mono">plv-multicloud-nim-lab</span><h3>One NIM product on every cloud</h3><p>AKS and GKE with GitOps, per-cloud AIPerf price-performance, LoRA MLOps and an air-gapped design.</p></a>
+  <a href="https://github.com/jaypadhya1605/labs-nvidia-learn/tree/main/ttg-agentic-genai-lab"><span class="mono">ttg-agentic-genai-lab</span><h3>Agentic AI, quantified</h3><p>A travel-disruption agent with MCP tools, a scored golden set and an engine bake-off for agent traffic.</p></a>
+ </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+ <p>A personal learning project built on public documents and synthetic data. It isn't a customer deployment, and it isn't an official Microsoft or NVIDIA resource. Customer names are fictional. Views are my own.</p>
+</div></footer>
+</body>
+</html>

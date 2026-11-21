@@ -1,0 +1,81 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<style>
+.flow{display:grid;grid-template-columns:repeat(5,1fr);gap:0;align-items:stretch}
+.step{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 16px 14px;margin-right:30px;position:relative}
+.step:not(:last-child)::after{content:"→";position:absolute;right:-26px;top:50%;transform:translateY(-50%);font-size:26px;color:var(--muted)}
+.step:last-child{margin-right:0}
+.step .n{width:30px;height:30px;border-radius:50%;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:15px;margin-bottom:8px}
+.step h3{font-size:19px;margin-bottom:4px}
+.step p{font-size:14.5px;color:var(--muted);line-height:1.35}
+.step .who{margin-top:10px;font-size:14px;font-weight:700}
+.gates{grid-template-columns:repeat(6,1fr)}
+.gate{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 14px 16px;border-top:6px solid var(--plan)}
+.gate.d{border-top-color:var(--done)} .gate.p{border-top-color:var(--part)}
+.gate .g{font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.08em}
+.gate h3{font-size:18px;margin:4px 0 8px;line-height:1.2}
+.gate .chip{margin-bottom:10px}
+.gate ul.t li{font-size:13.6px;margin:4px 0}
+.gate .open{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:13px;color:var(--muted);line-height:1.35}
+.traps{grid-template-columns:repeat(5,1fr)}
+.trap{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.trap b{font-size:15.5px;display:block;margin-bottom:3px}
+.trap span{font-size:13.8px;color:var(--muted);line-height:1.35;display:block}
+.trap i{font-style:normal;font-size:12.5px;font-weight:700;color:var(--gap);display:block;margin-top:6px}
+.split{display:grid;grid-template-columns:1.05fr 2fr;gap:20px}
+.prob p{font-size:16px;line-height:1.45;margin-bottom:8px}
+</style></head><body><div class="page">
+<div class="hdr"><div class="kicker">Field note 1 · The lab in one picture</div>
+<h1>One healthcare app, engineered from Azure-hosted to NVIDIA-served</h1>
+<div class="sub">Northstar Provider Operations (fictional) · two public editions (2025 vs 2026) of a health plan's Marketplace provider manual</div></div>
+<div class="wrap">
+<div class="split">
+ <div class="card prob"><div class="sec" style="margin-top:0">The business problem</div>
+  <p><b>343 pages, two editions.</b> Staff must find what actually changed: fax numbers, vendors, rules.</p>
+  <p><b>Wrong answers cost money.</b> A stale fax delays prior auth; a lapsed license can suspend payment.</p>
+  <p><b>Look-alikes fool people and AI.</b> 2025 addenda look new in 2026; other products sit beside Marketplace in the same tables.</p>
+  <p class="muted" style="font-size:14.5px">Answer: under 50 words, cites edition + page, code proves the page supports it, a person decides.</p>
+ </div>
+ <div><div class="sec" style="margin-top:0">The request path (memorize this)</div>
+  <div class="flow">
+   <div class="step"><div class="n" style="background:var(--az)">1</div><h3>Ask</h3><p>“What changed in pharmacy routing for 2026?”</p><div class="who" style="color:var(--az-d)">Provider ops analyst</div></div>
+   <div class="step"><div class="n" style="background:var(--az)">2</div><h3>Retrieve</h3><p>Page-level chunks, both editions, dated addenda</p><div class="who" style="color:var(--az-d)">Azure AI Search</div></div>
+   <div class="step"><div class="n" style="background:var(--nv)">3</div><h3>Generate</h3><p>Structured JSON answer, cited, &lt;50 words</p><div class="who" style="color:var(--nv-d)">Nemotron 3.5 Lightning</div></div>
+   <div class="step"><div class="n" style="background:var(--navy)">4</div><h3>Verify</h3><p>Cited page exists and contains the fact</p><div class="who">Python code checks</div></div>
+   <div class="step"><div class="n" style="background:var(--done)">5</div><h3>Approve</h3><p>Ops lead updates fax, vendor or procedure</p><div class="who" style="color:var(--done)">Human in the loop</div></div>
+  </div>
+  <div class="card" style="margin-top:14px;padding:12px 18px;font-size:15px;line-height:1.45">
+   <b style="color:var(--nv-d)">The NVIDIA arc:</b> step 3 starts as <b>Foundry-hosted</b> Nemotron (Fireworks, pay per token) → moves to <b>NIM on AKS A100</b> (P3) → gets compared against <b>vLLM, TensorRT-LLM and Triton</b> (P4). Steps 1, 2, 4, 5 stay fixed so the comparison is fair.
+  </div>
+ </div>
+</div>
+
+<div class="sec nv">Six gates · finish one before starting the next</div>
+<div class="grid gates">
+ <div class="gate d"><div class="g">G1 · P1</div><h3>Working foundation</h3><span class="chip c-done">Passed</span>
+  <ul class="t"><li>5/5 live checks</li><li>18 unit tests</li><li>Trace visible in Foundry</li><li>Python · AI Search · hosted Nemotron · OpenTelemetry</li></ul></div>
+ <div class="gate p"><div class="g">G2 · P2</div><h3>Quality + baseline</h3><span class="chip c-part">In progress</span>
+  <ul class="t"><li>AI-Q 2.2.1 on AKS, Entra-only via token-proxy sidecar</li><li>NVIDIA embeddings (2048-d) via Key Vault</li><li>Pharmacy report prototype</li></ul>
+  <div class="open">Open: AI-Q missed the pharmacy anchor; MCP, Guardrails, AIPerf, MLflow, 20 cases</div></div>
+ <div class="gate p"><div class="g">G3 · P3</div><h3>NIM on AKS</h3><span class="chip c-part">Infra proven</span>
+  <ul class="t"><li>A100 80 GB Spot pool</li><li>NIM 2.1.6 smoke test: real GPU inference</li><li>Workload identity · ACR · KV CSI</li></ul>
+  <div class="open">Open: Helm chart, NIM Operator cache/service, app answering through the GPU</div></div>
+ <div class="gate"><div class="g">G4 · P4</div><h3>GPU systems + serving</h3><span class="chip c-plan">Planned</span>
+  <ul class="t"><li>CUDA kernel + CPU reference</li><li>Nsight Systems · DCGM</li><li>trtllm-serve · Triton · vLLM vs NIM</li><li>AIPerf TTFT / ITL</li></ul>
+  <div class="open">Conditional: Dynamo, MIG, LoRA</div></div>
+ <div class="gate"><div class="g">G5 · P5</div><h3>Security + recovery</h3><span class="chip c-plan">Planned</span>
+  <ul class="t"><li>NeMo Guardrails hardened</li><li>401/403 + cross-team tests</li><li>Bounded work, failure drills</li></ul></div>
+ <div class="gate"><div class="g">G6 · P6</div><h3>Release + rollback</h3><span class="chip c-plan">Planned</span>
+  <ul class="t"><li>Terraform · Helm</li><li>GitHub Actions · Argo CD</li><li>MLflow release gates</li><li>Timed real rollback</li></ul></div>
+</div>
+
+<div class="sec">The five traps every answer must survive (fixed regression anchors)</div>
+<div class="grid traps">
+ <div class="trap"><b>1 · Pharmacy fax</b><span>The plan moved pharmacy authorizations to a new processor with a new fax</span><i>Catches: missing a real change</i></div>
+ <div class="trap"><b>2 · NICU auth</b><span>2026 sends NICU requests to a named outside vendor</span><i>Catches: invented vendor</i></div>
+ <div class="trap"><b>3 · AI voice</b><span>New 2026 ban on AI-voice calls to the plan; clinician review was already required</span><i>Catches: blending old + new rules</i></div>
+ <div class="trap"><b>4 · Payer ID</b><span>Unchanged across editions, while other products list different IDs</span><i>Catches: product mix-up</i></div>
+ <div class="trap"><b>5 · 15-day PCP</b><span>Set by the Sept 1, 2025 addendum, not new in 2026</span><i>Catches: false “new” claim</i></div>
+</div>
+</div>
+<div class="foot"><b>Memory hook:</b> Ask → Search → Nemotron → Verify → Human. Then make it run on <b>my</b> NVIDIA GPU, <b>measure</b> it, <b>secure</b> it, <b>ship</b> it. Public manuals only, no patient data. It is a learning lab, not a customer deployment.</div>
+</div></body></html>
